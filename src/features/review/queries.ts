@@ -1,5 +1,6 @@
 import { AssignmentAudience, MembershipStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isLateSubmission } from "./status";
 
 export async function getAssignmentSubmissionRoster(organizationId: string, assignmentId: string) {
   const assignment = await prisma.assignment.findFirst({
@@ -46,6 +47,13 @@ export async function getAssignmentSubmissionRoster(organizationId: string, assi
   );
   return {
     assignment,
-    rows: members.map((member) => ({ member, submission: submissionByUserId.get(member.userId) ?? null })),
+    rows: members.map((member) => {
+      const submission = submissionByUserId.get(member.userId) ?? null;
+      return {
+        member,
+        submission,
+        isLate: submission ? isLateSubmission(submission.submittedAt, assignment.deadline) : false,
+      };
+    }),
   };
 }

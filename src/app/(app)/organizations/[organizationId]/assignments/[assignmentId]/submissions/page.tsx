@@ -36,7 +36,7 @@ export default async function SubmissionStatusPage({
   const submittedCount = data.rows.filter(
     ({ submission }) => submission && submission.status !== SubmissionStatus.DRAFT,
   ).length;
-  const lateCount = data.rows.filter(({ submission }) => submission?.status === SubmissionStatus.LATE).length;
+  const lateCount = data.rows.filter(({ isLate }) => isLate).length;
   const reviewCount = data.rows.filter(({ submission }) =>
     submission ? REVIEW_PENDING_STATUSES.has(submission.status) : false,
   ).length;
@@ -55,7 +55,7 @@ export default async function SubmissionStatusPage({
         <Card><p className="text-sm text-slate-500">검토 대기 / 지각</p><strong className="mt-2 block text-2xl">{reviewCount} / {lateCount}</strong></Card>
       </div>
       <Card className="mt-5 overflow-x-auto p-0">
-        <table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"><tr><th className="p-4">이름</th><th className="p-4">학번</th><th className="p-4">상태</th><th className="p-4">제출 시각</th><th className="p-4">점수</th><th className="p-4">검토</th></tr></thead><tbody>{data.rows.map(({ member, submission }) => <tr className="border-b border-slate-100 last:border-0 dark:border-slate-800" key={member.userId}><td className="p-4"><strong>{member.user.name}</strong><span className="block text-xs text-slate-500">{member.user.email}</span></td><td className="p-4">{member.user.studentNumber ?? "-"}</td><td className="p-4">{submission ? STATUS_LABELS[submission.status] : "미제출"}</td><td className="p-4">{submission?.submittedAt ? formatKoreanDateTime(submission.submittedAt) : "-"}</td><td className="p-4">{submission?.reviews[0]?.score ?? "-"}</td><td className="p-4">{submission ? <Link className="inline-flex items-center gap-1 font-semibold text-indigo-600" href={`/organizations/${organizationId}/assignments/${assignmentId}/submissions/${submission.id}`}><Eye size={16} /> 보기</Link> : <span className="text-slate-400">-</span>}</td></tr>)}</tbody></table>
+        <table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"><tr><th className="p-4">이름</th><th className="p-4">학번</th><th className="p-4">상태</th><th className="p-4">제출 시각</th><th className="p-4">점수</th><th className="p-4">검토</th></tr></thead><tbody>{data.rows.map(({ member, submission, isLate }) => <tr className="border-b border-slate-100 last:border-0 dark:border-slate-800" key={member.userId}><td className="p-4"><strong>{member.user.name}</strong><span className="block text-xs text-slate-500">{member.user.email}</span></td><td className="p-4">{member.user.studentNumber ?? "-"}</td><td className="p-4">{submission ? `${STATUS_LABELS[submission.status]}${isLate ? " · 지각" : ""}` : "미제출"}</td><td className="p-4">{submission?.submittedAt ? formatKoreanDateTime(submission.submittedAt) : "-"}</td><td className="p-4">{submission?.reviews[0]?.score ?? "-"}</td><td className="p-4">{submission ? <Link className="inline-flex items-center gap-1 font-semibold text-indigo-600" href={`/organizations/${organizationId}/assignments/${assignmentId}/submissions/${submission.id}`}><Eye size={16} /> 보기</Link> : <span className="text-slate-400">-</span>}</td></tr>)}</tbody></table>
       </Card>
     </div>
   );
