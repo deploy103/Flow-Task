@@ -1,0 +1,26 @@
+name: Submission upload cleanup
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLEANUP_URL: ${{ secrets.SUBMISSION_CLEANUP_URL }}
+      CLEANUP_SECRET: ${{ secrets.SUBMISSION_CLEANUP_SECRET }}
+    steps:
+      - name: Checkout cleanup script
+        uses: actions/checkout@v7
+      - name: Require cleanup configuration
+        run: |
+          test -n "$CLEANUP_URL"
+          test -n "$CLEANUP_SECRET"
+      - name: Remove expired submission uploads
+        run: sh deploy/scripts/run-submission-cleanup.sh
