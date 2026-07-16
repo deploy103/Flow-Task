@@ -1,5 +1,5 @@
 import { MembershipStatus } from "@prisma/client";
-import { ArrowRight, Bell, Settings, Users } from "lucide-react";
+import { ArrowRight, Bell, ClipboardList, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,9 @@ export default async function OrganizationPage({ params }: { params: Promise<{ o
         {canManage && <Link href={`/organizations/${organizationId}/members`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Settings size={18} /> 구성원 관리</Link>}
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <Link href={`/organizations/${organizationId}/assignments`} className="block">
+          <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-950"><ClipboardList /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div><h2 className="mt-5 font-bold">과제</h2><p className="mt-1 text-sm text-slate-500">공개된 과제와 마감 일정을 확인하세요.</p></Card>
+        </Link>
         <Link href={`/organizations/${organizationId}/announcements`} className="block">
           <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-amber-50 p-3 text-amber-600 dark:bg-amber-950"><Bell /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div><h2 className="mt-5 font-bold">공지사항</h2><p className="mt-1 text-sm text-slate-500">조직 소식과 확인할 내용을 확인하세요.</p></Card>
         </Link>
