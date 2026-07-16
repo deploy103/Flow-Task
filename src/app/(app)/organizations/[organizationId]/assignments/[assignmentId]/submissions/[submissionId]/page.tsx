@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canReviewSubmissions } from "@/features/organization/permissions";
 import { reviewSubmission } from "@/features/review/actions";
+import { isLateSubmission } from "@/features/review/status";
 import { formatKoreanDateTime } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
 
@@ -44,7 +45,7 @@ export default async function SubmissionReviewPage({
     where: { id: submissionId, assignmentId, assignment: { organizationId } },
     include: {
       user: { select: { name: true, email: true, studentNumber: true } },
-      assignment: { select: { title: true, fields: { orderBy: { position: "asc" } } } },
+      assignment: { select: { title: true, deadline: true, fields: { orderBy: { position: "asc" } } } },
       versions: {
         orderBy: { version: "desc" },
         include: { answers: true, files: true },
@@ -58,11 +59,12 @@ export default async function SubmissionReviewPage({
   if (!submission) notFound();
   const latestVersion = submission.versions.find((version) => version.version === submission.latestVersion);
   if (!latestVersion) notFound();
+  const isLate = isLateSubmission(submission.submittedAt, submission.assignment.deadline);
 
   return (
     <div className="max-w-4xl">
       <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href={`/organizations/${organizationId}/assignments/${assignmentId}/submissions`}><ArrowLeft size={17} /> 제출 현황으로</Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-semibold text-indigo-600">제출물 검토</p><h1 className="mt-1 text-3xl font-bold">{submission.user.name}</h1><p className="mt-2 text-sm text-slate-500">{submission.user.studentNumber ?? "학번 없음"} · {submission.user.email}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold dark:bg-slate-800">{STATUS_LABELS[submission.status]} · {submission.latestVersion}차</span></div>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-semibold text-indigo-600">제출물 검토</p><h1 className="mt-1 text-3xl font-bold">{submission.user.name}</h1><p className="mt-2 text-sm text-slate-500">{submission.user.studentNumber ?? "학번 없음"} · {submission.user.email}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold dark:bg-slate-800">{STATUS_LABELS[submission.status]}{isLate ? " · 지각" : ""} · {submission.latestVersion}차</span></div>
       {query.error && <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">검토 내용이 유효하지 않거나 제출 버전이 변경되었습니다.</p>}
       {query.success && <p className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">검토 결과를 저장했습니다.</p>}
 

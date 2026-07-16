@@ -27,13 +27,14 @@ export async function GET(
   const data = await getAssignmentSubmissionRoster(parsed.data.organizationId, parsed.data.assignmentId);
   if (!data) return new Response("과제를 찾을 수 없습니다.", { status: 404 });
   const rows = [
-    createCsvRow(["이름", "학번", "이메일", "상태", "제출 시각", "최신 버전", "점수"]),
-    ...data.rows.map(({ member, submission }) =>
+    createCsvRow(["이름", "학번", "이메일", "상태", "지각 여부", "제출 시각", "최신 버전", "점수"]),
+    ...data.rows.map(({ member, submission, isLate }) =>
       createCsvRow([
         member.user.name,
         member.user.studentNumber,
         member.user.email,
         submission?.status ?? "NOT_SUBMITTED",
+        submission ? (isLate ? "LATE" : "ON_TIME") : null,
         submission?.submittedAt ? formatKoreanDateTime(submission.submittedAt) : null,
         submission?.latestVersion,
         submission?.reviews[0]?.score,
