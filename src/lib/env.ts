@@ -19,6 +19,10 @@ const storageEnvironmentSchema = z.object({
   SUBMISSION_STORAGE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9._-]{1,62}$/),
 });
 
+const cleanupEnvironmentSchema = z.object({
+  SUBMISSION_CLEANUP_SECRET: z.string().min(32),
+});
+
 export function getServerEnvironment() {
   return serverEnvironmentSchema.parse(process.env);
 }
@@ -35,5 +39,11 @@ export function getStorageEnvironment() {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     SUBMISSION_STORAGE_BUCKET: process.env.SUBMISSION_STORAGE_BUCKET,
+  });
+}
+
+export function getCleanupEnvironment() {
+  return cleanupEnvironmentSchema.parse({
+    SUBMISSION_CLEANUP_SECRET: process.env.SUBMISSION_CLEANUP_SECRET,
   });
 }
