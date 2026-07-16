@@ -29,5 +29,9 @@ export function canDownloadSubmissionFile(input: {
 }) {
   if (input.systemRole === SystemRole.SYSTEM_ADMIN) return true;
   if (input.membership?.status !== MembershipStatus.ACTIVE) return false;
-  return input.isOwner || input.membership.role === MembershipRole.ORG_ADMIN;
+  return (
+    input.isOwner ||
+    input.membership.role === MembershipRole.ORG_ADMIN ||
+    input.membership.role === MembershipRole.MENTOR
+  );
 }

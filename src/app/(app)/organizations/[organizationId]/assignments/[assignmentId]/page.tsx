@@ -1,5 +1,6 @@
-import { AssignmentAudience, AssignmentFieldType, SubmissionStatus } from "@prisma/client";
-import { CalendarClock, FileText, Link as LinkIcon, Upload, Users } from "lucide-react";
+import { AssignmentAudience, AssignmentFieldType, SubmissionReviewDecision, SubmissionStatus } from "@prisma/client";
+import { CalendarClock, ClipboardCheck, FileText, Link as LinkIcon, Upload, Users } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import {
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { canViewAssignment, isAssignmentPublished } from "@/features/assignment/visibility";
 import { requireOrganizationAccess } from "@/features/organization/guards";
-import { canManageOrganization } from "@/features/organization/permissions";
+import { canManageOrganization, canReviewSubmissions } from "@/features/organization/permissions";
 import { canSubmitAssignment } from "@/features/submission/access";
 import { saveSubmission } from "@/features/submission/actions";
 import { SubmissionActionButtons } from "@/features/submission/components/submission-action-buttons";
@@ -33,6 +34,12 @@ const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   DRAFT: "임시 저장",
   SUBMITTED: "제출 완료",
   LATE: "지각 제출",
+  REVIEWING: "검토 중",
+  APPROVED: "승인",
+  RESUBMIT_REQUIRED: "재제출 요청",
+};
+
+const REVIEW_DECISION_LABELS: Record<SubmissionReviewDecision, string> = {
   REVIEWING: "검토 중",
   APPROVED: "승인",
   RESUBMIT_REQUIRED: "재제출 요청",
@@ -70,6 +77,7 @@ export default async function AssignmentDetailPage({
   const [{ organizationId, assignmentId }, query] = await Promise.all([params, searchParams]);
   const { user, membership } = await requireOrganizationAccess(organizationId);
   const canManage = canManageOrganization({ systemRole: user.systemRole, membership });
+  const canReview = canReviewSubmissions({ systemRole: user.systemRole, membership });
   const assignment = await prisma.assignment.findFirst({
     where: { id: assignmentId, organizationId, archivedAt: null },
     include: {
@@ -79,6 +87,13 @@ export default async function AssignmentDetailPage({
       submissions: {
         where: { userId: user.id },
         include: {
+          reviews: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              reviewer: { select: { name: true } },
+              version: { select: { version: true } },
+            },
+          },
           versions: {
             orderBy: { version: "desc" },
             include: { answers: true, files: true },
@@ -95,9 +110,9 @@ export default async function AssignmentDetailPage({
     targetUserIds,
     userId: user.id,
     systemRole: user.systemRole,
-    canManage,
+    canManage: canManage || canReview,
   });
-  if (!visible || (!canManage && !isAssignmentPublished(assignment.opensAt))) notFound();
+  if (!visible || (!(canManage || canReview) && !isAssignmentPublished(assignment.opensAt))) notFound();
 
   const timingStatus = getAssignmentTimingStatus(assignment);
   const canSubmit = canSubmitAssignment({
@@ -108,6 +123,9 @@ export default async function AssignmentDetailPage({
   });
   const submission = assignment.submissions[0];
   const currentVersion = submission?.versions[0];
+  const latestReview = submission?.reviews.find(
+    (review) => review.version.version === submission.latestVersion,
+  );
   const answerByFieldId = new Map(currentVersion?.answers.map((answer) => [answer.fieldId, answer.value]));
   const currentFilesByFieldId = new Map(
     assignment.fields.map((field) => [
@@ -162,6 +180,12 @@ export default async function AssignmentDetailPage({
         <h2 className="text-lg font-bold">과제 설명</h2>
         <div className="mt-4 whitespace-pre-wrap leading-7">{assignment.description}</div>
       </Card>
+
+      {canReview && (
+        <Link className="mt-5 flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50 p-5 font-bold text-indigo-700 transition hover:border-indigo-400 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200" href={`/organizations/${organizationId}/assignments/${assignmentId}/submissions`}>
+          <span className="flex items-center gap-2"><ClipboardCheck size={20} /> 제출 현황 및 검토</span><span>열기 →</span>
+        </Link>
+      )}
 
       {canSubmit && (
         <Card className="mt-5">
@@ -247,6 +271,14 @@ export default async function AssignmentDetailPage({
       )}
 
       {submission?.versions.length ? (
+        <>
+        {latestReview && (
+          <Card className="mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">담당자 피드백</h2><strong className="text-indigo-600">{REVIEW_DECISION_LABELS[latestReview.decision]}</strong></div>
+            <p className="mt-2 text-sm text-slate-500">{latestReview.reviewer.name} · {formatKoreanDateTime(latestReview.createdAt)} · 점수 {latestReview.score ?? "-"}</p>
+            {latestReview.feedback && <p className="mt-4 whitespace-pre-wrap leading-7">{latestReview.feedback}</p>}
+          </Card>
+        )}
         <Card className="mt-5">
           <h2 className="flex items-center gap-2 text-lg font-bold"><FileText size={20} /> 제출 내역</h2>
           <div className="mt-4 space-y-3">
@@ -281,6 +313,7 @@ export default async function AssignmentDetailPage({
             ))}
           </div>
         </Card>
+        </>
       ) : null}
 
       {canManage && assignment.audience === AssignmentAudience.SELECTED_MEMBERS && (
