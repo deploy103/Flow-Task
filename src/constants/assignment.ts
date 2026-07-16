@@ -1,0 +1,12 @@
+export const DEFAULT_ASSIGNMENT_DEADLINE_DAYS = 7;
+export const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+export const KOREAN_TIME_OFFSET_MILLISECONDS = 9 * 60 * 60 * 1000;
+export const MAX_ASSIGNMENT_TITLE_LENGTH = 100;
+export const MAX_ASSIGNMENT_DESCRIPTION_LENGTH = 20_000;
+export const MAX_ASSIGNMENT_TARGET_COUNT = 500;
+
+export const ASSIGNMENT_FIELD_LABELS = {
+  TEXT: "제출 내용",
+  FILE: "결과 파일",
+  LINK: "관련 링크",
+} as const;
