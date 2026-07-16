@@ -23,6 +23,16 @@ enum MembershipStatus {
   INACTIVE
 }
 
+enum AnnouncementPriority {
+  NORMAL
+  IMPORTANT
+}
+
+enum AnnouncementAudience {
+  ALL_MEMBERS
+  SELECTED_MEMBERS
+}
+
 model User {
   id            String               @id @db.Uuid
   email         String               @unique @db.VarChar(320)
@@ -35,6 +45,9 @@ model User {
   organizations Organization[]       @relation("OrganizationCreator")
   invitations   OrganizationInvite[] @relation("InvitationCreator")
   auditLogs     AuditLog[]
+  announcements Announcement[]       @relation("AnnouncementAuthor")
+  announcementTargets AnnouncementTarget[]
+  announcementReads AnnouncementRead[]
 
   @@map("users")
 }
@@ -51,6 +64,7 @@ model Organization {
   members     OrganizationMember[]
   invites     OrganizationInvite[]
   auditLogs   AuditLog[]
+  announcements Announcement[]
 
   @@index([createdById])
   @@map("organizations")
@@ -104,4 +118,49 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+model Announcement {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  authorId       String               @map("author_id") @db.Uuid
+  title          String               @db.VarChar(100)
+  content        String               @db.Text
+  priority       AnnouncementPriority @default(NORMAL)
+  audience       AnnouncementAudience @default(ALL_MEMBERS)
+  publishedAt    DateTime             @default(now()) @map("published_at") @db.Timestamptz(6)
+  expiresAt      DateTime?            @map("expires_at") @db.Timestamptz(6)
+  archivedAt     DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  author         User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  targets        AnnouncementTarget[]
+  reads          AnnouncementRead[]
+
+  @@index([organizationId, publishedAt])
+  @@map("announcements")
+}
+
+model AnnouncementTarget {
+  announcementId String       @map("announcement_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([announcementId, userId])
+  @@index([userId])
+  @@map("announcement_targets")
+}
+
+model AnnouncementRead {
+  announcementId String       @map("announcement_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  confirmedAt    DateTime     @default(now()) @map("confirmed_at") @db.Timestamptz(6)
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([announcementId, userId])
+  @@index([userId, confirmedAt])
+  @@map("announcement_reads")
 }
