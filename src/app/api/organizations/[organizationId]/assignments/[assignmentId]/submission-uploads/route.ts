@@ -2,7 +2,6 @@ import { AssignmentFieldType, Prisma, SubmissionUploadStatus } from "@prisma/cli
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  SUBMISSION_UPLOAD_GRANT_TTL_MINUTES,
   SUBMISSION_UPLOAD_RATE_WINDOW_MINUTES,
   SUBMISSION_UPLOAD_RESERVED_BYTES,
 } from "@/constants/assignment";
@@ -15,6 +14,7 @@ import {
 } from "@/features/submission/schemas";
 import { resolveSubmissionStatus } from "@/features/submission/state";
 import { createSignedSubmissionUpload, createSubmissionStoragePath, removeSubmissionFile } from "@/features/submission/storage";
+import { getSubmissionUploadLifecycle } from "@/features/submission/upload-lifecycle";
 import {
   evaluateSubmissionUploadGrant,
   hasBoundedSubmissionUploadRequestBody,
@@ -99,9 +99,7 @@ export async function POST(
   const windowStartedAt = new Date(
     now.getTime() - SUBMISSION_UPLOAD_RATE_WINDOW_MINUTES * MILLISECONDS_PER_MINUTE,
   );
-  const expiresAt = new Date(
-    now.getTime() + SUBMISSION_UPLOAD_GRANT_TTL_MINUTES * MILLISECONDS_PER_MINUTE,
-  );
+  const { cleanupAfter, expiresAt, signedTokenExpiresAt } = getSubmissionUploadLifecycle(now);
   const storagePath = createSubmissionStoragePath({
     organizationId,
     assignmentId,
@@ -146,8 +144,8 @@ export async function POST(
           transaction.submissionUpload.aggregate({
             where: {
               userId: context.user.id,
-              status: SubmissionUploadStatus.PENDING,
-              expiresAt: { gt: now },
+              status: { in: [SubmissionUploadStatus.PENDING, SubmissionUploadStatus.FAILED] },
+              cleanupAfter: { gt: now },
             },
             _sum: { reservedBytes: true },
           }),
@@ -161,8 +159,8 @@ export async function POST(
           transaction.submissionUpload.aggregate({
             where: {
               assignment: { organizationId },
-              status: SubmissionUploadStatus.PENDING,
-              expiresAt: { gt: now },
+              status: { in: [SubmissionUploadStatus.PENDING, SubmissionUploadStatus.FAILED] },
+              cleanupAfter: { gt: now },
             },
             _sum: { reservedBytes: true },
           }),
@@ -194,6 +192,8 @@ export async function POST(
             sizeBytes: BigInt(metadata.sizeBytes),
             reservedBytes: BigInt(SUBMISSION_UPLOAD_RESERVED_BYTES),
             expiresAt,
+            signedTokenExpiresAt,
+            cleanupAfter,
           },
         });
         return {
@@ -222,7 +222,11 @@ export async function POST(
     await Promise.allSettled([
       prisma.submissionUpload.updateMany({
         where: { id: grantResult.grantId, status: SubmissionUploadStatus.PENDING },
-        data: { status: SubmissionUploadStatus.FAILED },
+        data: {
+          status: SubmissionUploadStatus.FAILED,
+          signedTokenExpiresAt: now,
+          cleanupAfter: now,
+        },
       }),
     ]);
     return jsonError("STORAGE_POLICY_INVALID", "파일 저장소를 사용할 수 없습니다.", 503);

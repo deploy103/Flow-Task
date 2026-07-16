@@ -57,6 +57,7 @@ enum SubmissionUploadStatus {
   PENDING
   CONSUMED
   FAILED
+  CLEANED
 }
 
 model User {
@@ -315,25 +316,32 @@ model SubmissionFile {
 }
 
 model SubmissionUpload {
-  id               String                 @id @default(uuid()) @db.Uuid
-  assignmentId     String                 @map("assignment_id") @db.Uuid
-  fieldId          String                 @map("field_id") @db.Uuid
-  userId           String                 @map("user_id") @db.Uuid
-  storagePath      String                 @unique @map("storage_path") @db.VarChar(500)
-  originalFilename String                 @map("original_filename") @db.VarChar(255)
-  mimeType         String                 @map("mime_type") @db.VarChar(100)
-  sizeBytes        BigInt                 @map("size_bytes")
-  reservedBytes    BigInt                 @map("reserved_bytes")
-  status           SubmissionUploadStatus @default(PENDING)
-  expiresAt        DateTime               @map("expires_at") @db.Timestamptz(6)
-  consumedAt       DateTime?              @map("consumed_at") @db.Timestamptz(6)
-  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  assignment       Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
-  field            AssignmentField        @relation(fields: [fieldId], references: [id], onDelete: Restrict)
-  user             User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id                   String                 @id @default(uuid()) @db.Uuid
+  assignmentId         String                 @map("assignment_id") @db.Uuid
+  fieldId              String                 @map("field_id") @db.Uuid
+  userId               String                 @map("user_id") @db.Uuid
+  storagePath          String                 @unique @map("storage_path") @db.VarChar(500)
+  originalFilename     String                 @map("original_filename") @db.VarChar(255)
+  mimeType             String                 @map("mime_type") @db.VarChar(100)
+  sizeBytes            BigInt                 @map("size_bytes")
+  reservedBytes        BigInt                 @map("reserved_bytes")
+  status               SubmissionUploadStatus @default(PENDING)
+  expiresAt            DateTime               @map("expires_at") @db.Timestamptz(6)
+  signedTokenExpiresAt DateTime               @map("signed_token_expires_at") @db.Timestamptz(6)
+  cleanupAfter         DateTime               @map("cleanup_after") @db.Timestamptz(6)
+  consumedAt           DateTime?              @map("consumed_at") @db.Timestamptz(6)
+  cleanedAt            DateTime?              @map("cleaned_at") @db.Timestamptz(6)
+  cleanupAttempts      Int                    @default(0) @map("cleanup_attempts")
+  lastCleanupAttemptAt DateTime?              @map("last_cleanup_attempt_at") @db.Timestamptz(6)
+  cleanupError         String?                @map("cleanup_error") @db.VarChar(80)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignment           Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  field                AssignmentField        @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
   @@index([userId, status, expiresAt])
+  @@index([status, cleanupAfter])
   @@index([assignmentId, fieldId, userId])
   @@map("submission_uploads")
 }

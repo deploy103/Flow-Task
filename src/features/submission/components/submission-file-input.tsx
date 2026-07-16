@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Input } from "@/components/ui/input";
 import {
   BYTES_PER_MEBIBYTE,
@@ -36,9 +36,32 @@ export function SubmissionFileInput({
   organizationId: string;
 }) {
   const [uploads, setUploads] = useState<{ id: string; name: string }[]>([]);
+  const uploadIdsRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { uploading, setUploading } = useSubmissionUpload();
   const endpoint = `/api/organizations/${organizationId}/assignments/${assignmentId}/submission-uploads`;
+
+  function setTrackedUploads(nextUploads: { id: string; name: string }[]) {
+    uploadIdsRef.current = nextUploads.map(({ id }) => id);
+    setUploads(nextUploads);
+  }
+
+  useEffect(() => {
+    const cancelOnPageExit = () => {
+      if (!uploadIdsRef.current.length) return;
+      void fetch(endpoint, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadIds: uploadIdsRef.current }),
+        keepalive: true,
+      });
+    };
+    window.addEventListener("pagehide", cancelOnPageExit);
+    return () => {
+      window.removeEventListener("pagehide", cancelOnPageExit);
+      cancelOnPageExit();
+    };
+  }, [endpoint]);
 
   async function cancelUploads(uploadIds: string[]) {
     if (!uploadIds.length) return true;
@@ -76,7 +99,7 @@ export function SubmissionFileInput({
       if (!(await cancelUploads(uploads.map(({ id }) => id)))) {
         throw new Error("UPLOAD_CANCEL_FAILED");
       }
-      setUploads([]);
+      setTrackedUploads([]);
       for (const file of files) {
         const metadata = validateSubmissionFile(file);
         if (!metadata || !(await hasValidSubmissionFileSignature(file, metadata.extension))) {
@@ -112,11 +135,11 @@ export function SubmissionFileInput({
           throw new Error("UPLOAD_FAILED");
         }
         completed.push({ id: grant.uploadId, name: metadata.originalFilename });
-        setUploads([...completed]);
+        setTrackedUploads([...completed]);
       }
     } catch {
       await Promise.allSettled([cancelUploads(completed.map(({ id }) => id))]);
-      setUploads([]);
+      setTrackedUploads([]);
       setError("파일 업로드에 실패했습니다. 잠시 후 다시 선택해 주세요.");
     } finally {
       setUploading(false);

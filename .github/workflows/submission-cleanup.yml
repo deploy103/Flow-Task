@@ -1,0 +1,28 @@
+name: Submission upload cleanup
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLEANUP_URL: ${{ secrets.SUBMISSION_CLEANUP_URL }}
+      CLEANUP_SECRET: ${{ secrets.SUBMISSION_CLEANUP_SECRET }}
+    steps:
+      - name: Require cleanup configuration
+        run: |
+          test -n "$CLEANUP_URL"
+          test -n "$CLEANUP_SECRET"
+      - name: Remove expired submission uploads
+        run: |
+          curl --fail-with-body --silent --show-error --retry 3 \
+            --request POST \
+            --header "Authorization: Bearer $CLEANUP_SECRET" \
+            "$CLEANUP_URL"
