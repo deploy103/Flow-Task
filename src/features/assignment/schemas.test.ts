@@ -32,6 +32,28 @@ describe("assignment schemas", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects calendar dates and times that JavaScript would normalize", () => {
+    expect(
+      createAssignmentSchema.safeParse({ ...validInput, opensAt: "2026-02-31T09:00" }).success,
+    ).toBe(false);
+    expect(
+      createAssignmentSchema.safeParse({ ...validInput, opensAt: "2026-01-01T24:00" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a leap day only in a leap year", () => {
+    expect(
+      createAssignmentSchema.safeParse({
+        ...validInput,
+        opensAt: "2024-02-29T09:00",
+        deadline: "2024-03-01T09:00",
+      }).success,
+    ).toBe(true);
+    expect(
+      createAssignmentSchema.safeParse({ ...validInput, opensAt: "2026-02-29T09:00" }).success,
+    ).toBe(false);
+  });
+
   it("rejects invalid target IDs and target lists above policy", () => {
     expect(assignmentTargetIdsSchema.safeParse(["not-a-uuid"]).success).toBe(false);
     expect(
