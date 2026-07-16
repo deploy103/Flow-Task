@@ -16,13 +16,11 @@ jobs:
       CLEANUP_URL: ${{ secrets.SUBMISSION_CLEANUP_URL }}
       CLEANUP_SECRET: ${{ secrets.SUBMISSION_CLEANUP_SECRET }}
     steps:
+      - name: Checkout cleanup script
+        uses: actions/checkout@v7
       - name: Require cleanup configuration
         run: |
           test -n "$CLEANUP_URL"
           test -n "$CLEANUP_SECRET"
       - name: Remove expired submission uploads
-        run: |
-          curl --fail-with-body --silent --show-error --retry 3 \
-            --request POST \
-            --header "Authorization: Bearer $CLEANUP_SECRET" \
-            "$CLEANUP_URL"
+        run: sh deploy/scripts/run-submission-cleanup.sh
