@@ -53,6 +53,12 @@ enum SubmissionStatus {
   RESUBMIT_REQUIRED
 }
 
+enum SubmissionUploadStatus {
+  PENDING
+  CONSUMED
+  FAILED
+}
+
 model User {
   id                  String               @id @db.Uuid
   email               String               @unique @db.VarChar(320)
@@ -71,6 +77,7 @@ model User {
   assignments         Assignment[]         @relation("AssignmentCreator")
   assignmentTargets   AssignmentTarget[]
   submissions         Submission[]
+  submissionUploads   SubmissionUpload[]
 
   @@map("users")
 }
@@ -190,23 +197,24 @@ model AnnouncementRead {
 }
 
 model Assignment {
-  id             String             @id @default(uuid()) @db.Uuid
-  organizationId String             @map("organization_id") @db.Uuid
-  createdById    String             @map("created_by_id") @db.Uuid
-  title          String             @db.VarChar(100)
-  description    String             @db.Text
-  audience       AssignmentAudience @default(ALL_MEMBERS)
-  opensAt        DateTime           @map("opens_at") @db.Timestamptz(6)
-  deadline       DateTime           @db.Timestamptz(6)
-  allowLate      Boolean            @default(false) @map("allow_late")
-  archivedAt     DateTime?          @map("archived_at") @db.Timestamptz(6)
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy      User               @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  targets        AssignmentTarget[]
-  fields         AssignmentField[]
-  submissions    Submission[]
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  createdById       String             @map("created_by_id") @db.Uuid
+  title             String             @db.VarChar(100)
+  description       String             @db.Text
+  audience          AssignmentAudience @default(ALL_MEMBERS)
+  opensAt           DateTime           @map("opens_at") @db.Timestamptz(6)
+  deadline          DateTime           @db.Timestamptz(6)
+  allowLate         Boolean            @default(false) @map("allow_late")
+  archivedAt        DateTime?          @map("archived_at") @db.Timestamptz(6)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy         User               @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  targets           AssignmentTarget[]
+  fields            AssignmentField[]
+  submissions       Submission[]
+  submissionUploads SubmissionUpload[]
 
   @@index([organizationId, opensAt, deadline])
   @@map("assignments")
@@ -233,6 +241,7 @@ model AssignmentField {
   assignment   Assignment          @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   answers      SubmissionAnswer[]
   files        SubmissionFile[]
+  uploads      SubmissionUpload[]
 
   @@unique([assignmentId, position])
   @@unique([assignmentId, type])
@@ -303,4 +312,28 @@ model SubmissionFile {
   @@index([fieldId])
   @@index([storagePath])
   @@map("submission_files")
+}
+
+model SubmissionUpload {
+  id               String                 @id @default(uuid()) @db.Uuid
+  assignmentId     String                 @map("assignment_id") @db.Uuid
+  fieldId          String                 @map("field_id") @db.Uuid
+  userId           String                 @map("user_id") @db.Uuid
+  storagePath      String                 @unique @map("storage_path") @db.VarChar(500)
+  originalFilename String                 @map("original_filename") @db.VarChar(255)
+  mimeType         String                 @map("mime_type") @db.VarChar(100)
+  sizeBytes        BigInt                 @map("size_bytes")
+  reservedBytes    BigInt                 @map("reserved_bytes")
+  status           SubmissionUploadStatus @default(PENDING)
+  expiresAt        DateTime               @map("expires_at") @db.Timestamptz(6)
+  consumedAt       DateTime?              @map("consumed_at") @db.Timestamptz(6)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignment       Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  field            AssignmentField        @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([userId, status, expiresAt])
+  @@index([assignmentId, fieldId, userId])
+  @@map("submission_uploads")
 }

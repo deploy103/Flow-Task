@@ -1,18 +1,23 @@
 "use server";
 
-import { AssignmentFieldType, Prisma } from "@prisma/client";
+import { AssignmentFieldType, Prisma, SubmissionUploadStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
+import {
+  MAX_SUBMISSION_FILE_COUNT,
+  MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES,
+} from "@/constants/assignment";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { prisma } from "@/lib/prisma";
 import { canSubmitAssignment } from "./access";
+import { validateSubmissionFileMetadata } from "./policy";
 import {
-  collectSubmissionFiles,
-  hasValidSubmissionFileSignature,
-  validateSubmissionFile,
-} from "./policy";
-import { submissionContextSchema, submissionLinkSchema, submissionTextSchema } from "./schemas";
+  submissionContextSchema,
+  submissionLinkSchema,
+  submissionTextSchema,
+  submissionUploadIdsSchema,
+} from "./schemas";
 import { resolveSubmissionStatus } from "./state";
-import { removeSubmissionFile, uploadSubmissionFile } from "./storage";
+import { removeSubmissionFile, verifyStoredSubmissionUpload } from "./storage";
 import { getNextSubmissionVersion, hasSubmissionVersionConflict } from "./versioning";
 
 type StoredFile = {
@@ -75,12 +80,7 @@ export async function saveSubmission(formData: FormData) {
   const currentVersion = currentSubmission?.versions[0];
   const answers: { fieldId: string; value: string }[] = [];
   const files: StoredFile[] = [];
-  const pendingFiles: {
-    fieldId: string;
-    file: File;
-    metadata: NonNullable<ReturnType<typeof validateSubmissionFile>>;
-  }[] = [];
-  const uploadedStoragePaths: string[] = [];
+  const selectedUploadIds: string[] = [];
 
   for (const field of assignment.fields) {
     if (field.type === AssignmentFieldType.TEXT || field.type === AssignmentFieldType.LINK) {
@@ -99,18 +99,70 @@ export async function saveSubmission(formData: FormData) {
       continue;
     }
 
-    const collectedFiles = collectSubmissionFiles(formData.getAll(`field-${field.id}`));
-    if (!collectedFiles.success) {
+    const rawUploadIds = formData.getAll(`upload-${field.id}`);
+    if (!rawUploadIds.every((value): value is string => typeof value === "string")) {
       submissionRedirect(organizationId, assignmentId, "error=invalid_file_count");
     }
-    if (collectedFiles.files.length) {
-      for (const uploadedFile of collectedFiles.files) {
-        const metadata = validateSubmissionFile(uploadedFile);
-        if (!metadata) submissionRedirect(organizationId, assignmentId, "error=invalid_file");
-        if (!(await hasValidSubmissionFileSignature(uploadedFile, metadata.extension))) {
+    const parsedUploadIds = submissionUploadIdsSchema.safeParse(rawUploadIds);
+    if (!parsedUploadIds.success) {
+      submissionRedirect(organizationId, assignmentId, "error=invalid_file_count");
+    }
+    if (parsedUploadIds.data.length) {
+      const uploads = await prisma.submissionUpload.findMany({
+        where: {
+          id: { in: parsedUploadIds.data },
+          assignmentId,
+          fieldId: field.id,
+          userId: user.id,
+          status: SubmissionUploadStatus.PENDING,
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (uploads.length !== parsedUploadIds.data.length) {
+        submissionRedirect(organizationId, assignmentId, "error=invalid_file");
+      }
+      if (
+        uploads.length > MAX_SUBMISSION_FILE_COUNT ||
+        uploads.reduce((total, upload) => total + upload.sizeBytes, BigInt(0)) >
+          BigInt(MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES)
+      ) {
+        submissionRedirect(organizationId, assignmentId, "error=invalid_file_count");
+      }
+      for (const upload of uploads) {
+        const metadata = validateSubmissionFileMetadata({
+          name: upload.originalFilename,
+          size: Number(upload.sizeBytes),
+          type: upload.mimeType,
+        });
+        let verified = false;
+        if (metadata) {
+          try {
+            verified = await verifyStoredSubmissionUpload({
+              storagePath: upload.storagePath,
+              sizeBytes: metadata.sizeBytes,
+              mimeType: metadata.mimeType,
+              extension: metadata.extension,
+            });
+          } catch {
+            verified = false;
+          }
+        }
+        if (!metadata || !verified) {
+          await prisma.submissionUpload.update({
+            where: { id: upload.id },
+            data: { status: SubmissionUploadStatus.FAILED },
+          });
+          await Promise.allSettled([removeSubmissionFile(upload.storagePath)]);
           submissionRedirect(organizationId, assignmentId, "error=invalid_file");
         }
-        pendingFiles.push({ fieldId: field.id, file: uploadedFile, metadata });
+        selectedUploadIds.push(upload.id);
+        files.push({
+          fieldId: field.id,
+          storagePath: upload.storagePath,
+          originalFilename: metadata.originalFilename,
+          mimeType: metadata.mimeType,
+          sizeBytes: upload.sizeBytes,
+        });
       }
     } else {
       files.push(
@@ -129,31 +181,10 @@ export async function saveSubmission(formData: FormData) {
       intent === "submit" &&
       field.required &&
       !files.some((file) => file.fieldId === field.id) &&
-      !pendingFiles.some((file) => file.fieldId === field.id)
+      !selectedUploadIds.length
     ) {
       submissionRedirect(organizationId, assignmentId, "error=file_required");
     }
-  }
-
-  try {
-    for (const pendingFile of pendingFiles) {
-      const storagePath = await uploadSubmissionFile(pendingFile.file, pendingFile.metadata, {
-        organizationId,
-        assignmentId,
-        userId: user.id,
-      });
-      uploadedStoragePaths.push(storagePath);
-      files.push({
-        fieldId: pendingFile.fieldId,
-        storagePath,
-        originalFilename: pendingFile.metadata.originalFilename,
-        mimeType: pendingFile.metadata.mimeType,
-        sizeBytes: BigInt(pendingFile.metadata.sizeBytes),
-      });
-    }
-  } catch {
-    await Promise.allSettled(uploadedStoragePaths.map((path) => removeSubmissionFile(path)));
-    submissionRedirect(organizationId, assignmentId, "error=upload_failed");
   }
 
   try {
@@ -167,6 +198,20 @@ export async function saveSubmission(formData: FormData) {
           hasSubmissionVersionConflict(existing.latestVersion, currentSubmission?.latestVersion ?? 0)
         ) {
           throw new Error("SUBMISSION_VERSION_CONFLICT");
+        }
+        if (selectedUploadIds.length) {
+          const availableUploads = await transaction.submissionUpload.count({
+            where: {
+              id: { in: selectedUploadIds },
+              assignmentId,
+              userId: user.id,
+              status: SubmissionUploadStatus.PENDING,
+              expiresAt: { gt: new Date() },
+            },
+          });
+          if (availableUploads !== selectedUploadIds.length) {
+            throw new Error("SUBMISSION_UPLOAD_CONFLICT");
+          }
         }
         const submission =
           existing ??
@@ -192,6 +237,18 @@ export async function saveSubmission(formData: FormData) {
             submittedAt: resolvedState.submittedAt,
           },
         });
+        if (selectedUploadIds.length) {
+          const consumed = await transaction.submissionUpload.updateMany({
+            where: {
+              id: { in: selectedUploadIds },
+              status: SubmissionUploadStatus.PENDING,
+            },
+            data: { status: SubmissionUploadStatus.CONSUMED, consumedAt: new Date() },
+          });
+          if (consumed.count !== selectedUploadIds.length) {
+            throw new Error("SUBMISSION_UPLOAD_CONFLICT");
+          }
+        }
         await transaction.auditLog.create({
           data: {
             actorId: user.id,
@@ -206,7 +263,6 @@ export async function saveSubmission(formData: FormData) {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch {
-    await Promise.allSettled(uploadedStoragePaths.map((path) => removeSubmissionFile(path)));
     submissionRedirect(organizationId, assignmentId, "error=save_failed");
   }
 

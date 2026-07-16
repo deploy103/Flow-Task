@@ -31,7 +31,9 @@ npm run dev
 
 `.env.local`에는 실제 개발 환경의 값만 넣고 Git에 커밋하지 않습니다. Supabase Auth의 Redirect URL에는 `http://localhost:3000/auth/callback`을 등록합니다.
 
-파일 제출을 사용하려면 Supabase Storage에 `.env.local`의 `SUBMISSION_STORAGE_BUCKET`과 같은 이름으로 비공개 버킷을 생성해야 합니다. `SUPABASE_SERVICE_ROLE_KEY`는 서버 런타임에서만 사용하며 공개 환경변수나 브라우저 코드에 넣지 않습니다. 서버는 업로드와 다운로드 때마다 버킷의 비공개 설정을 확인합니다.
+파일 제출을 사용하려면 Supabase Storage에 `.env.local`의 `SUBMISSION_STORAGE_BUCKET`과 같은 이름으로 비공개 버킷을 생성하고 버킷의 파일 크기 제한을 100MB 이하로 설정해야 합니다. `SUPABASE_SERVICE_ROLE_KEY`는 서버 런타임에서 signed upload 권한 발급과 검증에만 사용하며 공개 환경변수나 브라우저 코드에 넣지 않습니다. 파일 본문은 전역 Server Action을 거치지 않고 Storage로 직접 전송되며, 서버는 업로드 권한 발급 전 접근 권한·rate limit·quota를 검사하고 제출 연결 전에 실제 크기·MIME·파일 시그니처를 다시 확인합니다.
+
+업로드 권한은 15분 안에 제출에 연결해야 하며 사용자별 10분당 발급 횟수·누적 용량, 활성 대기 용량과 조직별 누적·대기 용량 제한을 적용합니다. 만료되거나 취소된 임시 업로드는 다음 권한 발급 과정에서 정리됩니다.
 
 ## 검사
 
