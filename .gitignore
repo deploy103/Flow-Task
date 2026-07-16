@@ -1,0 +1,48 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies and build
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Runtime files
+logs/
+uploads/
+tmp/
+*.log
+
+# Secrets and keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+secrets.yml
+secrets.yaml
+
+# Database and backups
+*.sql
+!prisma/migrations/**/*.sql
+*.dump
+*.sqlite
+*.db
+*.bak
+*.tar.gz
+*.zip
+
+# Deployment local overrides
+docker-compose.override.yml
+deploy/.env*
+!deploy/.env.example
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
