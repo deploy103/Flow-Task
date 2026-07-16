@@ -1,6 +1,8 @@
 import {
+  MAX_SUBMISSION_FILE_COUNT,
   MAX_SUBMISSION_FILE_SIZE_BYTES,
   MAX_SUBMISSION_FILENAME_LENGTH,
+  MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES,
   SUBMISSION_FILE_MIME_TYPES,
 } from "@/constants/assignment";
 
@@ -10,6 +12,10 @@ export type ValidatedSubmissionFile = {
   originalFilename: string;
   sizeBytes: number;
 };
+
+export type SubmissionFileCollectionResult =
+  | { success: true; files: File[] }
+  | { success: false; reason: "invalid_entry" | "too_many" | "total_too_large" };
 
 function getSafeOriginalFilename(name: string) {
   const basename = name.replace(/\\/g, "/").split("/").pop()?.trim() ?? "";
@@ -34,6 +40,23 @@ export function validateSubmissionFile(file: File): ValidatedSubmissionFile | nu
     originalFilename,
     sizeBytes: file.size,
   };
+}
+
+export function collectSubmissionFiles(
+  values: FormDataEntryValue[],
+): SubmissionFileCollectionResult {
+  const files: File[] = [];
+  for (const value of values) {
+    if (!(value instanceof File)) return { success: false, reason: "invalid_entry" };
+    if (value.size === 0 && value.name === "") continue;
+    files.push(value);
+  }
+  if (files.length > MAX_SUBMISSION_FILE_COUNT) return { success: false, reason: "too_many" };
+  const totalSizeBytes = files.reduce((total, file) => total + file.size, 0);
+  if (totalSizeBytes > MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES) {
+    return { success: false, reason: "total_too_large" };
+  }
+  return { success: true, files };
 }
 
 function startsWith(bytes: Uint8Array, signature: readonly number[]) {

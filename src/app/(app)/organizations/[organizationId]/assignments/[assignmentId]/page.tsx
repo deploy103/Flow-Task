@@ -3,7 +3,13 @@ import { CalendarClock, FileText, Link as LinkIcon, Upload, Users } from "lucide
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { SUBMISSION_FILE_MIME_TYPES } from "@/constants/assignment";
+import {
+  BYTES_PER_MEBIBYTE,
+  MAX_SUBMISSION_FILE_COUNT,
+  MAX_SUBMISSION_FILE_SIZE_BYTES,
+  MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES,
+  SUBMISSION_FILE_MIME_TYPES,
+} from "@/constants/assignment";
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { canViewAssignment, isAssignmentPublished } from "@/features/assignment/visibility";
 import { requireOrganizationAccess } from "@/features/organization/guards";
@@ -33,6 +39,7 @@ const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_input: "입력한 제출 내용을 다시 확인해 주세요.",
   invalid_file: "허용된 형식과 크기에 맞는 파일을 선택해 주세요.",
+  invalid_file_count: `파일은 최대 ${MAX_SUBMISSION_FILE_COUNT}개, 전체 ${MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES / BYTES_PER_MEBIBYTE}MB까지 제출할 수 있습니다.`,
   file_required: "필수 파일을 첨부해 주세요.",
   upload_failed: "파일 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.",
   save_failed: "제출 저장에 실패했습니다. 중복 제출 여부를 확인하고 다시 시도해 주세요.",
@@ -101,7 +108,10 @@ export default async function AssignmentDetailPage({
   const currentVersion = submission?.versions[0];
   const answerByFieldId = new Map(currentVersion?.answers.map((answer) => [answer.fieldId, answer.value]));
   const currentFilesByFieldId = new Map(
-    currentVersion?.files.map((file) => [file.fieldId, file]) ?? [],
+    assignment.fields.map((field) => [
+      field.id,
+      currentVersion?.files.filter((file) => file.fieldId === field.id) ?? [],
+    ]),
   );
   const submissionOpen = timingStatus === "OPEN" || timingStatus === "LATE_OPEN";
   const fileAccept = Object.keys(SUBMISSION_FILE_MIME_TYPES)
@@ -207,14 +217,23 @@ export default async function AssignmentDetailPage({
                       className="mt-3 pt-2"
                       disabled={!submissionOpen}
                       id={`field-${field.id}`}
+                      multiple
                       name={`field-${field.id}`}
                       type="file"
                     />
-                    <p className="mt-2 text-xs text-slate-500">PDF, 한글, Office, ZIP, PNG, JPG · 최대 100MB</p>
-                    {currentFilesByFieldId.get(field.id) && (
-                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                        현재 파일: {currentFilesByFieldId.get(field.id)?.originalFilename}
-                      </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      PDF, 한글, Office, ZIP, PNG, JPG · 최대 {MAX_SUBMISSION_FILE_COUNT}개 · 파일당 {MAX_SUBMISSION_FILE_SIZE_BYTES / BYTES_PER_MEBIBYTE}MB · 전체 {MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES / BYTES_PER_MEBIBYTE}MB
+                    </p>
+                    {(currentFilesByFieldId.get(field.id)?.length ?? 0) > 0 && (
+                      <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                        <p className="font-semibold">현재 파일</p>
+                        <ul className="mt-1 list-inside list-disc">
+                          {currentFilesByFieldId.get(field.id)?.map((file) => (
+                            <li key={file.id}>{file.originalFilename}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-1 text-xs text-slate-500">새 파일을 선택하면 현재 파일 전체가 교체됩니다.</p>
+                      </div>
                     )}
                   </div>
                 )}

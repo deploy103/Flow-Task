@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SUBMISSION_FILE_SIZE_BYTES } from "@/constants/assignment";
 import {
+  MAX_SUBMISSION_FILE_COUNT,
+  MAX_SUBMISSION_FILE_SIZE_BYTES,
+  MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES,
+} from "@/constants/assignment";
+import {
+  collectSubmissionFiles,
   hasValidSubmissionFileSignature,
   isSafeSubmissionUrl,
   validateSubmissionFile,
@@ -17,6 +22,51 @@ describe("submission URL policy", () => {
 });
 
 describe("submission file policy", () => {
+  it("collects every uploaded file and ignores only the browser empty placeholder", () => {
+    const files = [
+      new File(["a"], "first.pdf", { type: "application/pdf" }),
+      new File(["b"], "second.pdf", { type: "application/pdf" }),
+    ];
+    expect(collectSubmissionFiles(files)).toEqual({ success: true, files });
+    expect(collectSubmissionFiles([new File([], "", { type: "application/octet-stream" })])).toEqual({
+      success: true,
+      files: [],
+    });
+    expect(collectSubmissionFiles(["forged-entry"])).toEqual({
+      success: false,
+      reason: "invalid_entry",
+    });
+  });
+
+  it("rejects more than five files and a combined size over 300MB", () => {
+    const tooMany = Array.from(
+      { length: MAX_SUBMISSION_FILE_COUNT + 1 },
+      (_, index) => new File(["x"], `${index}.pdf`, { type: "application/pdf" }),
+    );
+    expect(collectSubmissionFiles(tooMany)).toEqual({ success: false, reason: "too_many" });
+
+    const largeFiles = [
+      new File(["x"], "first.pdf", { type: "application/pdf" }),
+      new File(["x"], "second.pdf", { type: "application/pdf" }),
+    ];
+    Object.defineProperty(largeFiles[0], "size", { value: MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES });
+    Object.defineProperty(largeFiles[1], "size", { value: 1 });
+    expect(collectSubmissionFiles(largeFiles)).toEqual({
+      success: false,
+      reason: "total_too_large",
+    });
+  });
+
+  it("accepts the exact file count and combined size limits", () => {
+    const files = Array.from(
+      { length: MAX_SUBMISSION_FILE_COUNT },
+      (_, index) => new File(["x"], `${index}.pdf`, { type: "application/pdf" }),
+    );
+    const sizePerFile = MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES / MAX_SUBMISSION_FILE_COUNT;
+    files.forEach((file) => Object.defineProperty(file, "size", { value: sizePerFile }));
+    expect(collectSubmissionFiles(files)).toEqual({ success: true, files });
+  });
+
   it("requires an allowed extension and matching MIME type", () => {
     expect(validateSubmissionFile(new File(["pdf"], "report.pdf", { type: "application/pdf" }))).toMatchObject({
       extension: "pdf",
