@@ -17,6 +17,8 @@ import { canManageOrganization } from "@/features/organization/permissions";
 import { canSubmitAssignment } from "@/features/submission/access";
 import { saveSubmission } from "@/features/submission/actions";
 import { SubmissionActionButtons } from "@/features/submission/components/submission-action-buttons";
+import { SubmissionFileInput } from "@/features/submission/components/submission-file-input";
+import { SubmissionUploadProvider } from "@/features/submission/components/submission-upload-context";
 import { formatKoreanDateTime } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
 
@@ -175,11 +177,12 @@ export default async function AssignmentDetailPage({
             )}
           </div>
 
-          <form action={saveSubmission} className="mt-5 space-y-5">
-            <input type="hidden" name="organizationId" value={organizationId} />
-            <input type="hidden" name="assignmentId" value={assignmentId} />
-            {assignment.fields.map((field) => (
-              <div key={field.id}>
+          <SubmissionUploadProvider>
+            <form action={saveSubmission} className="mt-5 space-y-5">
+              <input type="hidden" name="organizationId" value={organizationId} />
+              <input type="hidden" name="assignmentId" value={assignmentId} />
+              {assignment.fields.map((field) => (
+                <div key={field.id}>
                 <label className="mb-2 block text-sm font-semibold" htmlFor={`field-${field.id}`}>
                   {field.label} {field.required && <span className="text-red-500">*</span>}
                 </label>
@@ -212,14 +215,12 @@ export default async function AssignmentDetailPage({
                 {field.type === AssignmentFieldType.FILE && (
                   <div className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
                     <div className="flex items-center gap-2 text-sm font-semibold"><Upload size={18} /> 파일 선택</div>
-                    <Input
+                    <SubmissionFileInput
                       accept={fileAccept}
-                      className="mt-3 pt-2"
+                      assignmentId={assignmentId}
                       disabled={!submissionOpen}
-                      id={`field-${field.id}`}
-                      multiple
-                      name={`field-${field.id}`}
-                      type="file"
+                      fieldId={field.id}
+                      organizationId={organizationId}
                     />
                     <p className="mt-2 text-xs text-slate-500">
                       PDF, 한글, Office, ZIP, PNG, JPG · 최대 {MAX_SUBMISSION_FILE_COUNT}개 · 파일당 {MAX_SUBMISSION_FILE_SIZE_BYTES / BYTES_PER_MEBIBYTE}MB · 전체 {MAX_SUBMISSION_TOTAL_FILE_SIZE_BYTES / BYTES_PER_MEBIBYTE}MB
@@ -237,10 +238,11 @@ export default async function AssignmentDetailPage({
                     )}
                   </div>
                 )}
-              </div>
-            ))}
-            <SubmissionActionButtons disabled={!submissionOpen} />
-          </form>
+                </div>
+              ))}
+              <SubmissionActionButtons disabled={!submissionOpen} />
+            </form>
+          </SubmissionUploadProvider>
         </Card>
       )}
 

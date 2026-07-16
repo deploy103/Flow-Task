@@ -25,7 +25,11 @@ function getSafeOriginalFilename(name: string) {
   return basename;
 }
 
-export function validateSubmissionFile(file: File): ValidatedSubmissionFile | null {
+export function validateSubmissionFileMetadata(file: {
+  name: string;
+  size: number;
+  type: string;
+}): ValidatedSubmissionFile | null {
   const originalFilename = getSafeOriginalFilename(file.name);
   const extension = originalFilename?.split(".").pop()?.toLowerCase();
   if (!originalFilename || !extension || !(extension in SUBMISSION_FILE_MIME_TYPES)) return null;
@@ -40,6 +44,10 @@ export function validateSubmissionFile(file: File): ValidatedSubmissionFile | nu
     originalFilename,
     sizeBytes: file.size,
   };
+}
+
+export function validateSubmissionFile(file: File) {
+  return validateSubmissionFileMetadata(file);
 }
 
 export function collectSubmissionFiles(
@@ -63,11 +71,10 @@ function startsWith(bytes: Uint8Array, signature: readonly number[]) {
   return signature.every((value, index) => bytes[index] === value);
 }
 
-export async function hasValidSubmissionFileSignature(
-  file: File,
+export function hasValidSubmissionFileSignatureBytes(
+  bytes: Uint8Array,
   extension: keyof typeof SUBMISSION_FILE_MIME_TYPES,
 ) {
-  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
   if (extension === "pdf") return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
   if (extension === "png") return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   if (extension === "jpg" || extension === "jpeg") return startsWith(bytes, [0xff, 0xd8, 0xff]);
@@ -77,6 +84,14 @@ export async function hasValidSubmissionFileSignature(
     startsWith(bytes, [0x50, 0x4b, 0x05, 0x06]) ||
     startsWith(bytes, [0x50, 0x4b, 0x07, 0x08])
   );
+}
+
+export async function hasValidSubmissionFileSignature(
+  file: File,
+  extension: keyof typeof SUBMISSION_FILE_MIME_TYPES,
+) {
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  return hasValidSubmissionFileSignatureBytes(bytes, extension);
 }
 
 export function isSafeSubmissionUrl(value: string) {
