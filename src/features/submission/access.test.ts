@@ -52,6 +52,13 @@ describe("submission file download access", () => {
         membership: { role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE },
       }),
     ).toBe(true);
+    expect(
+      canDownloadSubmissionFile({
+        isOwner: false,
+        systemRole: SystemRole.USER,
+        membership: { role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE },
+      }),
+    ).toBe(true);
   });
 
   it("rejects inactive owners while retaining system administrator access", () => {

@@ -19,3 +19,12 @@ export function canViewOrganization(context: PermissionContext) {
     context.membership?.status === MembershipStatus.ACTIVE
   );
 }
+
+export function canReviewSubmissions(context: PermissionContext) {
+  return (
+    context.systemRole === SystemRole.SYSTEM_ADMIN ||
+    (context.membership?.status === MembershipStatus.ACTIVE &&
+      (context.membership.role === MembershipRole.ORG_ADMIN ||
+        context.membership.role === MembershipRole.MENTOR))
+  );
+}
