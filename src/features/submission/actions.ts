@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { prisma } from "@/lib/prisma";
 import { canSubmitAssignment } from "./access";
-import { hasValidSubmissionFileSignature, validateSubmissionFile } from "./policy";
+import {
+  collectSubmissionFiles,
+  hasValidSubmissionFileSignature,
+  validateSubmissionFile,
+} from "./policy";
 import { submissionContextSchema, submissionLinkSchema, submissionTextSchema } from "./schemas";
 import { resolveSubmissionStatus } from "./state";
 import { removeSubmissionFile, uploadSubmissionFile } from "./storage";
@@ -95,15 +99,19 @@ export async function saveSubmission(formData: FormData) {
       continue;
     }
 
-    const uploadedValue = formData.get(`field-${field.id}`);
-    const uploadedFile = uploadedValue instanceof File && uploadedValue.size > 0 ? uploadedValue : null;
-    if (uploadedFile) {
-      const metadata = validateSubmissionFile(uploadedFile);
-      if (!metadata) submissionRedirect(organizationId, assignmentId, "error=invalid_file");
-      if (!(await hasValidSubmissionFileSignature(uploadedFile, metadata.extension))) {
-        submissionRedirect(organizationId, assignmentId, "error=invalid_file");
+    const collectedFiles = collectSubmissionFiles(formData.getAll(`field-${field.id}`));
+    if (!collectedFiles.success) {
+      submissionRedirect(organizationId, assignmentId, "error=invalid_file_count");
+    }
+    if (collectedFiles.files.length) {
+      for (const uploadedFile of collectedFiles.files) {
+        const metadata = validateSubmissionFile(uploadedFile);
+        if (!metadata) submissionRedirect(organizationId, assignmentId, "error=invalid_file");
+        if (!(await hasValidSubmissionFileSignature(uploadedFile, metadata.extension))) {
+          submissionRedirect(organizationId, assignmentId, "error=invalid_file");
+        }
+        pendingFiles.push({ fieldId: field.id, file: uploadedFile, metadata });
       }
-      pendingFiles.push({ fieldId: field.id, file: uploadedFile, metadata });
     } else {
       files.push(
         ...(currentVersion?.files
