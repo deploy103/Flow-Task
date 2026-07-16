@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensureUserProfile } from "./profile-recovery";
 
 export async function requireAuthenticatedUser() {
   const supabase = await createSupabaseServerClient();
@@ -10,10 +10,10 @@ export async function requireAuthenticatedUser() {
     redirect("/login");
   }
 
-  const user = await prisma.user.findUnique({ where: { id: data.user.id } });
-  if (!user) {
-    redirect("/login?error=profile_missing");
+  try {
+    return await ensureUserProfile(data.user);
+  } catch {
+    await supabase.auth.signOut();
+    redirect("/login?error=profile_recovery_failed");
   }
-
-  return user;
 }

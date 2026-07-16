@@ -7,14 +7,22 @@ import { getServerEnvironment } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loginSchema, profileSchema, signUpSchema } from "./schemas";
 import { requireAuthenticatedUser } from "./guards";
+import { ensureUserProfile } from "./profile-recovery";
 
 export async function login(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/login?error=invalid_input");
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) redirect("/login?error=invalid_credentials");
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error || !data.user) redirect("/login?error=invalid_credentials");
+
+  try {
+    await ensureUserProfile(data.user);
+  } catch {
+    await supabase.auth.signOut();
+    redirect("/login?error=profile_recovery_failed");
+  }
 
   redirect("/dashboard");
 }
@@ -29,18 +37,18 @@ export async function signUp(formData: FormData) {
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      data: { name: parsed.data.name },
+      data: { name: parsed.data.name, student_number: parsed.data.studentNumber },
       emailRedirectTo: `${NEXT_PUBLIC_APP_URL}/auth/callback`,
     },
   });
 
-  if (error || !data.user) redirect("/signup?error=signup_failed");
+  if (error || !data.user || data.user.identities?.length === 0) {
+    redirect("/signup?error=signup_failed");
+  }
 
   try {
-    await prisma.user.create({
-      data: {
-        id: data.user.id,
-        email: parsed.data.email,
+    await ensureUserProfile(data.user, {
+      preferredSeed: {
         name: parsed.data.name,
         studentNumber: parsed.data.studentNumber,
       },
