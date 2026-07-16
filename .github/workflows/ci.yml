@@ -41,6 +41,8 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+      - name: Cleanup workflow script tests
+        run: sh deploy/scripts/test-submission-cleanup.sh
       - name: Production build
         run: npm run build
       - name: Dependency audit

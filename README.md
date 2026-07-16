@@ -35,7 +35,7 @@ npm run dev
 
 업로드 권한은 15분 안에 제출에 연결해야 하며 사용자별 10분당 발급 횟수·누적 용량, 미소비 signed token의 실제 수명이 끝날 때까지 유지되는 예약량과 조직별 누적·대기 용량 제한을 적용합니다. Supabase signed upload의 2시간 유효기간과 10분의 시계 오차 여유가 지난 미소비 객체는 사용자 소속이나 과제 상태와 무관한 janitor가 정리합니다. 삭제 실패는 DB에 횟수·시각·안전한 오류 코드를 기록하고 다음 실행에서 재시도합니다.
 
-주기 정리를 사용하려면 애플리케이션에 32자 이상의 `SUBMISSION_CLEANUP_SECRET`을 설정하고 GitHub Actions Secret `SUBMISSION_CLEANUP_SECRET`에도 같은 값을 등록합니다. `SUBMISSION_CLEANUP_URL`에는 배포된 `/api/internal/maintenance/submission-uploads` 전체 URL을 등록합니다. `Submission upload cleanup` 워크플로가 15분마다 실행되며 설정이 누락되거나 정리 API가 실패하면 Workflow 실패로 관측됩니다.
+주기 정리를 사용하려면 애플리케이션에 32자 이상의 `SUBMISSION_CLEANUP_SECRET`을 설정하고 GitHub Actions Secret `SUBMISSION_CLEANUP_SECRET`에도 같은 값을 등록합니다. `SUBMISSION_CLEANUP_URL`에는 HTTPS를 사용하는 배포된 `/api/internal/maintenance/submission-uploads` 전체 URL을 등록합니다. `Submission upload cleanup` 워크플로는 HTTP URL과 리다이렉트를 거부하고, 정확한 HTTP 200 및 `success: true`, `failed: 0` 응답을 확인하며 15분마다 실행됩니다. 설정 누락, 인증 실패, 리다이렉트, 서버 오류, 일부 삭제 실패는 모두 Workflow 실패로 관측됩니다.
 
 ## 검사
 
