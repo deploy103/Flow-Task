@@ -4,6 +4,23 @@ export const KOREAN_TIME_OFFSET_MILLISECONDS = 9 * 60 * 60 * 1000;
 export const MAX_ASSIGNMENT_TITLE_LENGTH = 100;
 export const MAX_ASSIGNMENT_DESCRIPTION_LENGTH = 20_000;
 export const MAX_ASSIGNMENT_TARGET_COUNT = 500;
+export const MAX_SUBMISSION_TEXT_LENGTH = 50_000;
+export const MAX_SUBMISSION_LINK_LENGTH = 2_048;
+export const MAX_SUBMISSION_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+export const MAX_SUBMISSION_FILENAME_LENGTH = 255;
+
+export const SUBMISSION_FILE_MIME_TYPES = {
+  pdf: ["application/pdf"],
+  hwp: ["application/x-hwp", "application/haansofthwp", "application/octet-stream"],
+  hwpx: ["application/vnd.hancom.hwpx", "application/zip", "application/octet-stream"],
+  docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  pptx: ["application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  zip: ["application/zip", "application/x-zip-compressed"],
+  png: ["image/png"],
+  jpg: ["image/jpeg"],
+  jpeg: ["image/jpeg"],
+} as const;
 
 export const ASSIGNMENT_FIELD_LABELS = {
   TEXT: "제출 내용",
