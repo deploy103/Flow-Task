@@ -33,38 +33,52 @@ enum AnnouncementAudience {
   SELECTED_MEMBERS
 }
 
+enum AssignmentAudience {
+  ALL_MEMBERS
+  SELECTED_MEMBERS
+}
+
+enum AssignmentFieldType {
+  TEXT
+  FILE
+  LINK
+}
+
 model User {
-  id            String               @id @db.Uuid
-  email         String               @unique @db.VarChar(320)
-  name          String               @db.VarChar(50)
-  studentNumber String?              @map("student_number") @db.VarChar(30)
-  systemRole    SystemRole           @default(USER) @map("system_role")
-  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  memberships   OrganizationMember[]
-  organizations Organization[]       @relation("OrganizationCreator")
-  invitations   OrganizationInvite[] @relation("InvitationCreator")
-  auditLogs     AuditLog[]
-  announcements Announcement[]       @relation("AnnouncementAuthor")
+  id                  String               @id @db.Uuid
+  email               String               @unique @db.VarChar(320)
+  name                String               @db.VarChar(50)
+  studentNumber       String?              @map("student_number") @db.VarChar(30)
+  systemRole          SystemRole           @default(USER) @map("system_role")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships         OrganizationMember[]
+  organizations       Organization[]       @relation("OrganizationCreator")
+  invitations         OrganizationInvite[] @relation("InvitationCreator")
+  auditLogs           AuditLog[]
+  announcements       Announcement[]       @relation("AnnouncementAuthor")
   announcementTargets AnnouncementTarget[]
-  announcementReads AnnouncementRead[]
+  announcementReads   AnnouncementRead[]
+  assignments         Assignment[]         @relation("AssignmentCreator")
+  assignmentTargets   AssignmentTarget[]
 
   @@map("users")
 }
 
 model Organization {
-  id          String               @id @default(uuid()) @db.Uuid
-  name        String               @db.VarChar(80)
-  description String?              @db.VarChar(500)
-  createdById String               @map("created_by_id") @db.Uuid
-  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt  DateTime?            @map("archived_at") @db.Timestamptz(6)
-  createdBy   User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members     OrganizationMember[]
-  invites     OrganizationInvite[]
-  auditLogs   AuditLog[]
+  id            String               @id @default(uuid()) @db.Uuid
+  name          String               @db.VarChar(80)
+  description   String?              @db.VarChar(500)
+  createdById   String               @map("created_by_id") @db.Uuid
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt    DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdBy     User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members       OrganizationMember[]
+  invites       OrganizationInvite[]
+  auditLogs     AuditLog[]
   announcements Announcement[]
+  assignments   Assignment[]
 
   @@index([createdById])
   @@map("organizations")
@@ -86,18 +100,18 @@ model OrganizationMember {
 }
 
 model OrganizationInvite {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @map("organization_id") @db.Uuid
-  codeHash       String           @unique @map("code_hash") @db.Char(64)
-  role           MembershipRole   @default(MEMBER)
-  maxUses        Int?             @map("max_uses")
-  usedCount      Int              @default(0) @map("used_count")
-  expiresAt      DateTime         @map("expires_at") @db.Timestamptz(6)
-  createdById    String           @map("created_by_id") @db.Uuid
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  revokedAt      DateTime?        @map("revoked_at") @db.Timestamptz(6)
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy      User             @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  codeHash       String         @unique @map("code_hash") @db.Char(64)
+  role           MembershipRole @default(MEMBER)
+  maxUses        Int?           @map("max_uses")
+  usedCount      Int            @default(0) @map("used_count")
+  expiresAt      DateTime       @map("expires_at") @db.Timestamptz(6)
+  createdById    String         @map("created_by_id") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt      DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User           @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([organizationId, expiresAt])
   @@map("organization_invites")
@@ -163,4 +177,51 @@ model AnnouncementRead {
   @@id([announcementId, userId])
   @@index([userId, confirmedAt])
   @@map("announcement_reads")
+}
+
+model Assignment {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  createdById    String             @map("created_by_id") @db.Uuid
+  title          String             @db.VarChar(100)
+  description    String             @db.Text
+  audience       AssignmentAudience @default(ALL_MEMBERS)
+  opensAt        DateTime           @map("opens_at") @db.Timestamptz(6)
+  deadline       DateTime           @db.Timestamptz(6)
+  allowLate      Boolean            @default(false) @map("allow_late")
+  archivedAt     DateTime?          @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User               @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  targets        AssignmentTarget[]
+  fields         AssignmentField[]
+
+  @@index([organizationId, opensAt, deadline])
+  @@map("assignments")
+}
+
+model AssignmentTarget {
+  assignmentId String     @map("assignment_id") @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([assignmentId, userId])
+  @@index([userId])
+  @@map("assignment_targets")
+}
+
+model AssignmentField {
+  id           String              @id @default(uuid()) @db.Uuid
+  assignmentId String              @map("assignment_id") @db.Uuid
+  type         AssignmentFieldType
+  label        String              @db.VarChar(80)
+  required     Boolean             @default(true)
+  position     Int
+  assignment   Assignment          @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, position])
+  @@unique([assignmentId, type])
+  @@map("assignment_fields")
 }
