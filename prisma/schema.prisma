@@ -66,6 +66,21 @@ enum SubmissionReviewDecision {
   RESUBMIT_REQUIRED
 }
 
+enum NotificationType {
+  ANNOUNCEMENT_CREATED
+  ASSIGNMENT_CREATED
+  DEADLINE_APPROACHING
+  MISSING_SUBMISSION
+  RESUBMIT_REQUIRED
+  SUBMISSION_APPROVED
+}
+
+enum CalendarEventType {
+  CLASS
+  MEETING
+  EVENT
+}
+
 model User {
   id                  String               @id @db.Uuid
   email               String               @unique @db.VarChar(320)
@@ -86,24 +101,28 @@ model User {
   submissions         Submission[]
   submissionUploads   SubmissionUpload[]
   submissionReviews   SubmissionReview[]   @relation("SubmissionReviewer")
+  notifications       Notification[]
+  calendarEvents      CalendarEvent[]      @relation("CalendarEventCreator")
 
   @@map("users")
 }
 
 model Organization {
-  id            String               @id @default(uuid()) @db.Uuid
-  name          String               @db.VarChar(80)
-  description   String?              @db.VarChar(500)
-  createdById   String               @map("created_by_id") @db.Uuid
-  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt    DateTime?            @map("archived_at") @db.Timestamptz(6)
-  createdBy     User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members       OrganizationMember[]
-  invites       OrganizationInvite[]
-  auditLogs     AuditLog[]
-  announcements Announcement[]
-  assignments   Assignment[]
+  id             String               @id @default(uuid()) @db.Uuid
+  name           String               @db.VarChar(80)
+  description    String?              @db.VarChar(500)
+  createdById    String               @map("created_by_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt     DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdBy      User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members        OrganizationMember[]
+  invites        OrganizationInvite[]
+  auditLogs      AuditLog[]
+  announcements  Announcement[]
+  assignments    Assignment[]
+  notifications  Notification[]
+  calendarEvents CalendarEvent[]
 
   @@index([createdById])
   @@map("organizations")
@@ -373,4 +392,44 @@ model SubmissionReview {
   @@index([versionId, createdAt])
   @@index([reviewerId, createdAt])
   @@map("submission_reviews")
+}
+
+model Notification {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  organizationId String?          @map("organization_id") @db.Uuid
+  type           NotificationType
+  title          String           @db.VarChar(120)
+  body           String           @db.VarChar(500)
+  href           String           @db.VarChar(500)
+  dedupeKey      String           @map("dedupe_key") @db.VarChar(180)
+  readAt         DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+model CalendarEvent {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  createdById    String            @map("created_by_id") @db.Uuid
+  type           CalendarEventType
+  title          String            @db.VarChar(100)
+  description    String?           @db.VarChar(1000)
+  startsAt       DateTime          @map("starts_at") @db.Timestamptz(6)
+  endsAt         DateTime          @map("ends_at") @db.Timestamptz(6)
+  archivedAt     DateTime?         @map("archived_at") @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User              @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, startsAt, endsAt])
+  @@index([createdById, createdAt])
+  @@map("calendar_events")
 }
