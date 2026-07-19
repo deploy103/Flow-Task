@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { requireOrganizationAccess } from "@/features/organization/guards";
-import { canManageOrganization } from "@/features/organization/permissions";
+import { canManageOrganization, canReviewSubmissions } from "@/features/organization/permissions";
 import { formatKoreanDateTime } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
 
@@ -19,11 +19,13 @@ export default async function AssignmentsPage({ params }: { params: Promise<{ or
   const { organizationId } = await params;
   const { user, membership } = await requireOrganizationAccess(organizationId);
   const canManage = canManageOrganization({ systemRole: user.systemRole, membership });
+  const canViewAllAssignments =
+    canManage || canReviewSubmissions({ systemRole: user.systemRole, membership });
   const assignments = await prisma.assignment.findMany({
     where: {
       organizationId,
       archivedAt: null,
-      ...(canManage
+      ...(canViewAllAssignments
         ? {}
         : {
             opensAt: { lte: new Date() },
