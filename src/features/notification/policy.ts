@@ -17,6 +17,10 @@ export function hasFinalSubmission(status?: SubmissionStatus | null) {
   return Boolean(status && status !== SubmissionStatus.DRAFT);
 }
 
+export function isAssignmentNotificationPublished(opensAt: Date, now = new Date()) {
+  return opensAt <= now;
+}
+
 export function getDeadlineNotificationKind(input: {
   now: Date;
   opensAt: Date;

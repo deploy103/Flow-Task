@@ -1,6 +1,6 @@
 "use server";
 
-import { AssignmentAudience, MembershipStatus, NotificationType } from "@prisma/client";
+import { AssignmentAudience, MembershipStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireOrganizationAccess } from "@/features/organization/guards";
@@ -95,26 +95,6 @@ export async function createAssignment(formData: FormData) {
           },
         },
       });
-      const notificationUserIds = parsed.data.audience === AssignmentAudience.SELECTED_MEMBERS
-        ? targetUserIds
-        : (await transaction.organizationMember.findMany({
-            where: { organizationId: parsed.data.organizationId, status: MembershipStatus.ACTIVE },
-            select: { userId: true },
-          })).map(({ userId }) => userId);
-      if (notificationUserIds.length) {
-        await transaction.notification.createMany({
-          data: notificationUserIds.map((userId) => ({
-            userId,
-            organizationId: parsed.data.organizationId,
-            type: NotificationType.ASSIGNMENT_CREATED,
-            title: "새 과제가 등록되었습니다",
-            body: parsed.data.title,
-            href: `/organizations/${parsed.data.organizationId}/assignments/${assignment.id}`,
-            dedupeKey: `assignment:${assignment.id}:created`,
-          })),
-          skipDuplicates: true,
-        });
-      }
       return assignment.id;
     });
   } catch {
