@@ -1,6 +1,6 @@
 import { MembershipRole, MembershipStatus, SystemRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { canManageOrganization, canViewOrganization } from "./permissions";
+import { canManageOrganization, canReviewSubmissions, canViewOrganization } from "./permissions";
 
 describe("organization permissions", () => {
   it("allows only active organization admins to manage", () => {
@@ -16,5 +16,20 @@ describe("organization permissions", () => {
 
   it("denies a user who is not an active member", () => {
     expect(canViewOrganization({ systemRole: SystemRole.USER, membership: null })).toBe(false);
+  });
+
+  it("allows active mentors and admins to review submissions", () => {
+    expect(
+      canReviewSubmissions({
+        systemRole: SystemRole.USER,
+        membership: { role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE },
+      }),
+    ).toBe(true);
+    expect(
+      canReviewSubmissions({
+        systemRole: SystemRole.USER,
+        membership: { role: MembershipRole.MEMBER, status: MembershipStatus.ACTIVE },
+      }),
+    ).toBe(false);
   });
 });
