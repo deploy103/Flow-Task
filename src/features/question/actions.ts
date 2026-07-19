@@ -7,6 +7,7 @@ import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization } from "@/features/organization/permissions";
 import { prisma } from "@/lib/prisma";
 import { canAnswerQuestion, canCreateQuestion, canSetQuestionStatus } from "./policy";
+import { canAssignMentorRelation } from "./mentor-relation";
 import { requireQuestionAccess } from "./queries";
 import { acceptAnswerSchema, answerSchema, assignQuestionMentorSchema, createQuestionSchema, mentorRelationSchema, statusSchema } from "./schemas";
 import { questionStoragePath, removeQuestionAttachment, uploadQuestionAttachment, validateQuestionAttachment } from "./storage";
@@ -89,9 +90,16 @@ export async function acceptQuestionAnswer(formData: FormData) {
 export async function assignMentorRelation(formData: FormData) {
   const parsed = mentorRelationSchema.safeParse(Object.fromEntries(formData)); if (!parsed.success) redirect("/dashboard?error=invalid_relation");
   const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
-  const members = await prisma.organizationMember.findMany({ where: { organizationId: parsed.data.organizationId, status: MembershipStatus.ACTIVE, userId: { in: [parsed.data.mentorId, parsed.data.menteeId] } }, select: { userId: true, role: true } });
-  if (members.length !== 2 || members.find(({ userId }) => userId === parsed.data.mentorId)?.role !== MembershipRole.MENTOR) redirect(`${path(parsed.data.organizationId)}/mentors?error=invalid_members`);
-  await prisma.$transaction(async (tx) => { if (parsed.data.type === MentorRelationType.PRIMARY) await tx.mentorRelation.updateMany({ where: { organizationId: parsed.data.organizationId, menteeId: parsed.data.menteeId, type: MentorRelationType.PRIMARY, endedAt: null }, data: { type: MentorRelationType.SECONDARY } }); await tx.mentorRelation.upsert({ where: { organizationId_mentorId_menteeId: { organizationId: parsed.data.organizationId, mentorId: parsed.data.mentorId, menteeId: parsed.data.menteeId } }, create: parsed.data, update: { type: parsed.data.type, endedAt: null } }); await tx.auditLog.create({ data: { actorId: user.id, organizationId: parsed.data.organizationId, action: "MENTOR_RELATION_ASSIGNED", targetType: "USER", targetId: parsed.data.menteeId, metadata: { mentorId: parsed.data.mentorId, type: parsed.data.type } } }); });
+  const members = await prisma.organizationMember.findMany({ where: { organizationId: parsed.data.organizationId, userId: { in: [parsed.data.mentorId, parsed.data.menteeId] } }, select: { userId: true, role: true, status: true } });
+  const mentor = members.find(({ userId }) => userId === parsed.data.mentorId);
+  const mentee = members.find(({ userId }) => userId === parsed.data.menteeId);
+  if (!canAssignMentorRelation(mentor, mentee)) redirect(`${path(parsed.data.organizationId)}/mentors?error=invalid_members`);
+  try {
+    await prisma.$transaction(async (tx) => { if (parsed.data.type === MentorRelationType.PRIMARY) await tx.mentorRelation.updateMany({ where: { organizationId: parsed.data.organizationId, menteeId: parsed.data.menteeId, type: MentorRelationType.PRIMARY, endedAt: null }, data: { type: MentorRelationType.SECONDARY } }); await tx.mentorRelation.upsert({ where: { organizationId_mentorId_menteeId: { organizationId: parsed.data.organizationId, mentorId: parsed.data.mentorId, menteeId: parsed.data.menteeId } }, create: parsed.data, update: { type: parsed.data.type, endedAt: null } }); await tx.auditLog.create({ data: { actorId: user.id, organizationId: parsed.data.organizationId, action: "MENTOR_RELATION_ASSIGNED", targetType: "USER", targetId: parsed.data.menteeId, metadata: { mentorId: parsed.data.mentorId, type: parsed.data.type } } }); }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (parsed.data.type === MentorRelationType.PRIMARY && error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) redirect(`${path(parsed.data.organizationId)}/mentors?error=primary_conflict`);
+    throw error;
+  }
   redirect(`${path(parsed.data.organizationId)}/mentors?message=assigned`);
 }
 
