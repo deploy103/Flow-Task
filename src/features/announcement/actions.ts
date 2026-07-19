@@ -1,6 +1,6 @@
 "use server";
 
-import { AnnouncementAudience, MembershipStatus } from "@prisma/client";
+import { AnnouncementAudience, MembershipStatus, NotificationType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -67,6 +67,26 @@ export async function createAnnouncement(formData: FormData) {
           metadata: { priority: parsed.data.priority, audience: parsed.data.audience },
         },
       });
+      const notificationUserIds = parsed.data.audience === AnnouncementAudience.SELECTED_MEMBERS
+        ? recipientIds
+        : (await transaction.organizationMember.findMany({
+            where: { organizationId: parsed.data.organizationId, status: MembershipStatus.ACTIVE },
+            select: { userId: true },
+          })).map(({ userId }) => userId);
+      if (notificationUserIds.length) {
+        await transaction.notification.createMany({
+          data: notificationUserIds.map((userId) => ({
+            userId,
+            organizationId: parsed.data.organizationId,
+            type: NotificationType.ANNOUNCEMENT_CREATED,
+            title: "새 공지가 등록되었습니다",
+            body: parsed.data.title,
+            href: `/organizations/${parsed.data.organizationId}/announcements/${announcement.id}`,
+            dedupeKey: `announcement:${announcement.id}`,
+          })),
+          skipDuplicates: true,
+        });
+      }
       return announcement.id;
     });
   } catch {

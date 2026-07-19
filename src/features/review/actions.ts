@@ -1,6 +1,6 @@
 "use server";
 
-import { Prisma, SubmissionStatus } from "@prisma/client";
+import { NotificationType, Prisma, SubmissionReviewDecision, SubmissionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canReviewSubmissions } from "@/features/organization/permissions";
@@ -29,14 +29,14 @@ export async function reviewSubmission(formData: FormData) {
       async (transaction) => {
         const submission = await transaction.submission.findFirst({
           where: { id: submissionId, assignmentId, assignment: { organizationId } },
-          include: { versions: { where: { id: versionId }, select: { id: true, version: true } } },
+          include: { assignment: { select: { title: true } }, versions: { where: { id: versionId }, select: { id: true, version: true } } },
         });
         const version = submission?.versions[0];
         if (!submission || !version || version.version !== submission.latestVersion) {
           throw new Error("STALE_SUBMISSION_VERSION");
         }
         if (submission.status === SubmissionStatus.DRAFT) throw new Error("DRAFT_CANNOT_BE_REVIEWED");
-        await transaction.submissionReview.create({
+        const review = await transaction.submissionReview.create({
           data: {
             submissionId,
             versionId,
@@ -66,6 +66,18 @@ export async function reviewSubmission(formData: FormData) {
             },
           },
         });
+        if (parsed.data.decision !== SubmissionReviewDecision.REVIEWING) {
+          const approved = parsed.data.decision === SubmissionReviewDecision.APPROVED;
+          await transaction.notification.create({ data: {
+            userId: submission.userId,
+            organizationId,
+            type: approved ? NotificationType.SUBMISSION_APPROVED : NotificationType.RESUBMIT_REQUIRED,
+            title: approved ? "제출물이 승인되었습니다" : "재제출이 필요합니다",
+            body: submission.assignment.title,
+            href: `/organizations/${organizationId}/assignments/${assignmentId}`,
+            dedupeKey: `submission-review:${review.id}`,
+          } });
+        }
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

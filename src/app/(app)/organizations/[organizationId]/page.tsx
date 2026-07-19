@@ -1,5 +1,5 @@
 import { MembershipStatus } from "@prisma/client";
-import { ArrowRight, Bell, ClipboardList, Settings, Users } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, ClipboardList, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -31,12 +31,14 @@ export default async function OrganizationPage({ params }: { params: Promise<{ o
         <Link href={`/organizations/${organizationId}/announcements`} className="block">
           <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-amber-50 p-3 text-amber-600 dark:bg-amber-950"><Bell /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div><h2 className="mt-5 font-bold">공지사항</h2><p className="mt-1 text-sm text-slate-500">조직 소식과 확인할 내용을 확인하세요.</p></Card>
         </Link>
+        <Link href={`/organizations/${organizationId}/calendar`} className="block">
+          <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-emerald-50 p-3 text-emerald-600 dark:bg-emerald-950"><CalendarDays /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div><h2 className="mt-5 font-bold">일정</h2><p className="mt-1 text-sm text-slate-500">조직 일정과 과제 마감을 달력으로 확인하세요.</p></Card>
+        </Link>
         <Card><div className="flex items-center justify-between"><span className="rounded-xl bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-950"><Users /></span><span className="text-3xl font-black">{organization._count.members}</span></div><h2 className="mt-5 font-bold">활동 중인 구성원</h2><p className="mt-1 text-sm text-slate-500">함께 활동하는 조직원 수입니다.</p></Card>
         <Link href={`/organizations/${organizationId}/members`} className={canManage ? "block" : "pointer-events-none"} aria-disabled={!canManage}>
           <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-emerald-50 p-3 text-emerald-600 dark:bg-emerald-950"><Settings /></span>{canManage && <ArrowRight className="text-slate-400 transition group-hover:translate-x-1" />}</div><h2 className="mt-5 font-bold">권한과 초대</h2><p className="mt-1 text-sm text-slate-500">초대 코드를 만들고 구성원의 역할을 관리합니다.</p></Card>
         </Link>
       </div>
-      <div className="mt-8 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700">과제와 공지는 다음 개발 단계에서 이 공간에 연결됩니다.</div>
     </div>
   );
 }
