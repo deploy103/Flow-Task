@@ -73,12 +73,47 @@ enum NotificationType {
   MISSING_SUBMISSION
   RESUBMIT_REQUIRED
   SUBMISSION_APPROVED
+  QUESTION_CREATED
+  QUESTION_ANSWERED
+  QUESTION_ASSIGNED
+  ANSWER_ACCEPTED
 }
 
 enum CalendarEventType {
   CLASS
   MEETING
   EVENT
+}
+
+enum QuestionBoardType {
+  PUBLIC_QNA
+  MENTOR_QNA
+  PRIVATE_MENTOR
+}
+
+enum QuestionCategory {
+  WEB
+  SYSTEM
+  REVERSING
+  FORENSICS
+  CRYPTOGRAPHY
+  NETWORK
+  PROGRAMMING
+  ASSIGNMENT
+  OTHER
+}
+
+enum QuestionStatus {
+  WAITING
+  IN_PROGRESS
+  NEEDS_INFO
+  RESOLVED
+  CLOSED
+}
+
+enum MentorRelationType {
+  PRIMARY
+  SECONDARY
 }
 
 model User {
@@ -103,26 +138,33 @@ model User {
   submissionReviews   SubmissionReview[]   @relation("SubmissionReviewer")
   notifications       Notification[]
   calendarEvents      CalendarEvent[]      @relation("CalendarEventCreator")
+  questions           Question[]           @relation("QuestionAuthor")
+  assignedQuestions   Question[]           @relation("QuestionAssignedMentor")
+  questionAnswers     QuestionAnswer[]
+  mentorRelations     MentorRelation[]     @relation("MentorRelationMentor")
+  menteeRelations     MentorRelation[]     @relation("MentorRelationMentee")
 
   @@map("users")
 }
 
 model Organization {
-  id             String               @id @default(uuid()) @db.Uuid
-  name           String               @db.VarChar(80)
-  description    String?              @db.VarChar(500)
-  createdById    String               @map("created_by_id") @db.Uuid
-  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  archivedAt     DateTime?            @map("archived_at") @db.Timestamptz(6)
-  createdBy      User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members        OrganizationMember[]
-  invites        OrganizationInvite[]
-  auditLogs      AuditLog[]
-  announcements  Announcement[]
-  assignments    Assignment[]
-  notifications  Notification[]
-  calendarEvents CalendarEvent[]
+  id              String               @id @default(uuid()) @db.Uuid
+  name            String               @db.VarChar(80)
+  description     String?              @db.VarChar(500)
+  createdById     String               @map("created_by_id") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt      DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdBy       User                 @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members         OrganizationMember[]
+  invites         OrganizationInvite[]
+  auditLogs       AuditLog[]
+  announcements   Announcement[]
+  assignments     Assignment[]
+  notifications   Notification[]
+  calendarEvents  CalendarEvent[]
+  questions       Question[]
+  mentorRelations MentorRelation[]
 
   @@index([createdById])
   @@map("organizations")
@@ -242,6 +284,7 @@ model Assignment {
   fields            AssignmentField[]
   submissions       Submission[]
   submissionUploads SubmissionUpload[]
+  questions         Question[]
 
   @@index([organizationId, opensAt, deadline])
   @@map("assignments")
@@ -432,4 +475,92 @@ model CalendarEvent {
   @@index([organizationId, startsAt, endsAt])
   @@index([createdById, createdAt])
   @@map("calendar_events")
+}
+
+model MentorRelation {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  mentorId       String             @map("mentor_id") @db.Uuid
+  menteeId       String             @map("mentee_id") @db.Uuid
+  type           MentorRelationType @default(SECONDARY)
+  startedAt      DateTime           @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime?          @map("ended_at") @db.Timestamptz(6)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  mentor         User               @relation("MentorRelationMentor", fields: [mentorId], references: [id], onDelete: Restrict)
+  mentee         User               @relation("MentorRelationMentee", fields: [menteeId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, mentorId, menteeId])
+  @@index([organizationId, menteeId, type, endedAt])
+  @@index([organizationId, mentorId, endedAt])
+  @@map("mentor_relations")
+}
+
+model Question {
+  id                  String               @id @default(uuid()) @db.Uuid
+  organizationId      String               @map("organization_id") @db.Uuid
+  authorId            String               @map("author_id") @db.Uuid
+  assignedMentorId    String?              @map("assigned_mentor_id") @db.Uuid
+  relatedAssignmentId String?              @map("related_assignment_id") @db.Uuid
+  boardType           QuestionBoardType    @map("board_type")
+  category            QuestionCategory
+  status              QuestionStatus       @default(WAITING)
+  title               String               @db.VarChar(120)
+  content             String               @db.Text
+  attempted           String?              @db.Text
+  errorMessage        String?              @map("error_message") @db.Text
+  code                String?              @db.Text
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  closedAt            DateTime?            @map("closed_at") @db.Timestamptz(6)
+  hiddenAt            DateTime?            @map("hidden_at") @db.Timestamptz(6)
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  author              User                 @relation("QuestionAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  assignedMentor      User?                @relation("QuestionAssignedMentor", fields: [assignedMentorId], references: [id], onDelete: Restrict)
+  relatedAssignment   Assignment?          @relation(fields: [relatedAssignmentId], references: [id], onDelete: Restrict)
+  answers             QuestionAnswer[]
+  attachments         QuestionAttachment[]
+
+  @@index([organizationId, boardType, status, createdAt])
+  @@index([authorId, createdAt])
+  @@index([assignedMentorId, status, createdAt])
+  @@map("questions")
+}
+
+model QuestionAnswer {
+  id          String               @id @default(uuid()) @db.Uuid
+  questionId  String               @map("question_id") @db.Uuid
+  authorId    String               @map("author_id") @db.Uuid
+  parentId    String?              @map("parent_id") @db.Uuid
+  content     String               @db.Text
+  code        String?              @db.Text
+  isAccepted  Boolean              @default(false) @map("is_accepted")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  editedAt    DateTime?            @map("edited_at") @db.Timestamptz(6)
+  hiddenAt    DateTime?            @map("hidden_at") @db.Timestamptz(6)
+  question    Question             @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  author      User                 @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  parent      QuestionAnswer?      @relation("QuestionAnswerReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies     QuestionAnswer[]     @relation("QuestionAnswerReplies")
+  attachments QuestionAttachment[]
+
+  @@index([questionId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("question_answers")
+}
+
+model QuestionAttachment {
+  id               String          @id @default(uuid()) @db.Uuid
+  questionId       String?         @map("question_id") @db.Uuid
+  answerId         String?         @map("answer_id") @db.Uuid
+  storagePath      String          @unique @map("storage_path") @db.VarChar(500)
+  originalFilename String          @map("original_filename") @db.VarChar(255)
+  mimeType         String          @map("mime_type") @db.VarChar(100)
+  sizeBytes        Int             @map("size_bytes")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  question         Question?       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answer           QuestionAnswer? @relation(fields: [answerId], references: [id], onDelete: Restrict)
+
+  @@index([questionId])
+  @@index([answerId])
+  @@map("question_attachments")
 }
