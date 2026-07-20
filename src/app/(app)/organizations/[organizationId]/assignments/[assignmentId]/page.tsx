@@ -13,6 +13,7 @@ import {
 } from "@/constants/assignment";
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { canViewAssignment, isAssignmentPublished } from "@/features/assignment/visibility";
+import { AssignmentChallenges } from "@/features/challenge/components/assignment-challenges";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization, canReviewSubmissions } from "@/features/organization/permissions";
 import { canSubmitAssignment } from "@/features/submission/access";
@@ -72,7 +73,13 @@ export default async function AssignmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string; assignmentId: string }>;
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    success?: string;
+    challenge_error?: string;
+    challenge_success?: string;
+    challenge_item?: string;
+  }>;
 }) {
   const [{ organizationId, assignmentId }, query] = await Promise.all([params, searchParams]);
   const { user, membership } = await requireOrganizationAccess(organizationId);
@@ -181,13 +188,30 @@ export default async function AssignmentDetailPage({
         <div className="mt-4 whitespace-pre-wrap leading-7">{assignment.description}</div>
       </Card>
 
+      <AssignmentChallenges
+        allowLate={assignment.allowLate}
+        assignmentId={assignmentId}
+        canManage={canManage}
+        canReview={canReview}
+        canSubmit={canSubmit}
+        deadline={assignment.deadline}
+        feedback={{
+          error: query.challenge_error,
+          success: query.challenge_success,
+          itemId: query.challenge_item,
+        }}
+        opensAt={assignment.opensAt}
+        organizationId={organizationId}
+        userId={user.id}
+      />
+
       {canReview && (
         <Link className="mt-5 flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50 p-5 font-bold text-indigo-700 transition hover:border-indigo-400 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200" href={`/organizations/${organizationId}/assignments/${assignmentId}/submissions`}>
           <span className="flex items-center gap-2"><ClipboardCheck size={20} /> 제출 현황 및 검토</span><span>열기 →</span>
         </Link>
       )}
 
-      {canSubmit && (
+      {canSubmit && assignment.fields.length > 0 && (
         <Card className="mt-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

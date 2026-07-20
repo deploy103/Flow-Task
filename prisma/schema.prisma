@@ -44,6 +44,26 @@ enum AssignmentFieldType {
   LINK
 }
 
+enum AssignmentItemType {
+  EXTERNAL_CHALLENGE
+}
+
+enum ExternalChallengeSource {
+  DREAMHACK
+  OTHER
+}
+
+enum ChallengeCategory {
+  WEB
+  SYSTEM
+  REVERSING
+  FORENSICS
+  CRYPTOGRAPHY
+  NETWORK
+  PROGRAMMING
+  OTHER
+}
+
 enum SubmissionStatus {
   DRAFT
   SUBMITTED
@@ -117,32 +137,33 @@ enum MentorRelationType {
 }
 
 model User {
-  id                  String               @id @db.Uuid
-  email               String               @unique @db.VarChar(320)
-  name                String               @db.VarChar(50)
-  studentNumber       String?              @map("student_number") @db.VarChar(30)
-  systemRole          SystemRole           @default(USER) @map("system_role")
-  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  memberships         OrganizationMember[]
-  organizations       Organization[]       @relation("OrganizationCreator")
-  invitations         OrganizationInvite[] @relation("InvitationCreator")
-  auditLogs           AuditLog[]
-  announcements       Announcement[]       @relation("AnnouncementAuthor")
-  announcementTargets AnnouncementTarget[]
-  announcementReads   AnnouncementRead[]
-  assignments         Assignment[]         @relation("AssignmentCreator")
-  assignmentTargets   AssignmentTarget[]
-  submissions         Submission[]
-  submissionUploads   SubmissionUpload[]
-  submissionReviews   SubmissionReview[]   @relation("SubmissionReviewer")
-  notifications       Notification[]
-  calendarEvents      CalendarEvent[]      @relation("CalendarEventCreator")
-  questions           Question[]           @relation("QuestionAuthor")
-  assignedQuestions   Question[]           @relation("QuestionAssignedMentor")
-  questionAnswers     QuestionAnswer[]
-  mentorRelations     MentorRelation[]     @relation("MentorRelationMentor")
-  menteeRelations     MentorRelation[]     @relation("MentorRelationMentee")
+  id                   String                @id @db.Uuid
+  email                String                @unique @db.VarChar(320)
+  name                 String                @db.VarChar(50)
+  studentNumber        String?               @map("student_number") @db.VarChar(30)
+  systemRole           SystemRole            @default(USER) @map("system_role")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships          OrganizationMember[]
+  organizations        Organization[]        @relation("OrganizationCreator")
+  invitations          OrganizationInvite[]  @relation("InvitationCreator")
+  auditLogs            AuditLog[]
+  announcements        Announcement[]        @relation("AnnouncementAuthor")
+  announcementTargets  AnnouncementTarget[]
+  announcementReads    AnnouncementRead[]
+  assignments          Assignment[]          @relation("AssignmentCreator")
+  assignmentTargets    AssignmentTarget[]
+  submissions          Submission[]
+  submissionUploads    SubmissionUpload[]
+  submissionReviews    SubmissionReview[]    @relation("SubmissionReviewer")
+  notifications        Notification[]
+  calendarEvents       CalendarEvent[]       @relation("CalendarEventCreator")
+  questions            Question[]            @relation("QuestionAuthor")
+  assignedQuestions    Question[]            @relation("QuestionAssignedMentor")
+  questionAnswers      QuestionAnswer[]
+  mentorRelations      MentorRelation[]      @relation("MentorRelationMentor")
+  menteeRelations      MentorRelation[]      @relation("MentorRelationMentee")
+  challengeSubmissions ChallengeSubmission[]
 
   @@map("users")
 }
@@ -285,6 +306,7 @@ model Assignment {
   submissions       Submission[]
   submissionUploads SubmissionUpload[]
   questions         Question[]
+  items             AssignmentItem[]
 
   @@index([organizationId, opensAt, deadline])
   @@map("assignments")
@@ -316,6 +338,95 @@ model AssignmentField {
   @@unique([assignmentId, position])
   @@unique([assignmentId, type])
   @@map("assignment_fields")
+}
+
+model AssignmentItem {
+  id                   String                @id @default(uuid()) @db.Uuid
+  assignmentId         String                @map("assignment_id") @db.Uuid
+  type                 AssignmentItemType
+  position             Int
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignment           Assignment            @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  externalChallenge    ExternalChallenge?
+  challengeGrading     ChallengeGrading?
+  challengeSubmissions ChallengeSubmission[]
+
+  @@unique([assignmentId, position])
+  @@index([assignmentId, type])
+  @@map("assignment_items")
+}
+
+model ExternalChallenge {
+  assignmentItemId String                  @id @map("assignment_item_id") @db.Uuid
+  source           ExternalChallengeSource
+  platform         String                  @db.VarChar(80)
+  title            String                  @db.VarChar(160)
+  description      String                  @db.Text
+  problemUrl       String                  @map("problem_url") @db.VarChar(2048)
+  category         ChallengeCategory
+  difficulty       String                  @db.VarChar(40)
+  points           Int
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignmentItem   AssignmentItem          @relation(fields: [assignmentItemId], references: [id], onDelete: Cascade)
+
+  @@index([source, category])
+  @@map("external_challenges")
+}
+
+model ChallengeGrading {
+  assignmentItemId       String         @id @map("assignment_item_id") @db.Uuid
+  flagDigest             String?        @map("flag_digest") @db.Char(64)
+  flagFormat             String?        @map("flag_format") @db.VarChar(160)
+  caseSensitive          Boolean        @default(true) @map("case_sensitive")
+  trimWhitespace         Boolean        @default(true) @map("trim_whitespace")
+  maxAttempts            Int?           @map("max_attempts")
+  penaltyPerWrongAttempt Int            @default(0) @map("penalty_per_wrong_attempt")
+  requireWriteup         Boolean        @default(false) @map("require_writeup")
+  requireWriteupUrl      Boolean        @default(false) @map("require_writeup_url")
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignmentItem         AssignmentItem @relation(fields: [assignmentItemId], references: [id], onDelete: Cascade)
+
+  @@map("challenge_grading")
+}
+
+model ChallengeSubmission {
+  id            String             @id @default(uuid()) @db.Uuid
+  itemId        String             @map("assignment_item_id") @db.Uuid
+  userId        String             @map("user_id") @db.Uuid
+  attemptsCount Int                @default(0) @map("attempts_count")
+  completedAt   DateTime?          @map("completed_at") @db.Timestamptz(6)
+  score         Int                @default(0)
+  writeup       String?            @db.Text
+  writeupUrl    String?            @map("writeup_url") @db.VarChar(2048)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  item          AssignmentItem     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  attempts      ChallengeAttempt[] @relation("ChallengeSubmissionAttempts")
+
+  @@unique([itemId, userId])
+  @@index([itemId, completedAt])
+  @@index([userId, updatedAt])
+  @@map("challenge_submissions")
+}
+
+model ChallengeAttempt {
+  id                String              @id @default(uuid()) @db.Uuid
+  itemId            String              @map("assignment_item_id") @db.Uuid
+  userId            String              @map("user_id") @db.Uuid
+  attemptNumber     Int                 @map("attempt_number")
+  isCorrect         Boolean             @map("is_correct")
+  scoreAfterAttempt Int                 @map("score_after_attempt")
+  submittedAt       DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  submission        ChallengeSubmission @relation("ChallengeSubmissionAttempts", fields: [itemId, userId], references: [itemId, userId], onDelete: Restrict)
+
+  @@unique([itemId, userId, attemptNumber])
+  @@index([itemId, submittedAt])
+  @@index([userId, submittedAt])
+  @@map("challenge_attempts")
 }
 
 model Submission {
