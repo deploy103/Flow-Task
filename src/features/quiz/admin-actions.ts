@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization } from "@/features/organization/permissions";
 import { prisma } from "@/lib/prisma";
+import { canAddQuizPoints } from "./admin-policy";
 import { hashQuizAnswer } from "./answer-hash";
 import {
   createQuizQuestionSchema,
@@ -88,7 +89,11 @@ export async function createQuizQuestion(formData: FormData) {
       if (!canManageOrganization({ systemRole: user.systemRole, membership })) throw new Error("FORBIDDEN");
       const quiz = await transaction.quiz.findFirst({ where: { assignmentItemId: parsed.data.quizId, assignmentItem: { assignmentId, assignment: { organizationId, archivedAt: null } } }, select: { assignmentItemId: true } });
       if (!quiz) throw new Error("NOT_FOUND");
-      const maximum = await transaction.quizQuestionPlacement.aggregate({ where: { quizId: quiz.assignmentItemId }, _max: { position: true } });
+      const [maximum, total] = await Promise.all([
+        transaction.quizQuestionPlacement.aggregate({ where: { quizId: quiz.assignmentItemId }, _max: { position: true } }),
+        transaction.quizQuestion.aggregate({ where: { placements: { some: { quizId: quiz.assignmentItemId } } }, _sum: { points: true } }),
+      ]);
+      if (!canAddQuizPoints(total._sum.points ?? 0, parsed.data.points)) throw new Error("TOTAL_POINTS_EXCEEDED");
       const question = await transaction.quizQuestion.create({
         data: {
           organizationId,
@@ -126,12 +131,14 @@ export async function reuseQuizQuestion(formData: FormData) {
     await prisma.$transaction(async (transaction) => {
       const membership = await transaction.organizationMember.findUnique({ where: { organizationId_userId: { organizationId, userId: user.id } } });
       if (!canManageOrganization({ systemRole: user.systemRole, membership })) throw new Error("FORBIDDEN");
-      const [quiz, question, maximum] = await Promise.all([
+      const [quiz, question, maximum, total] = await Promise.all([
         transaction.quiz.findFirst({ where: { assignmentItemId: quizId, assignmentItem: { assignmentId, assignment: { organizationId, archivedAt: null } } }, select: { assignmentItemId: true } }),
-        transaction.quizQuestion.findFirst({ where: { id: questionId, organizationId }, select: { id: true } }),
+        transaction.quizQuestion.findFirst({ where: { id: questionId, organizationId }, select: { id: true, points: true } }),
         transaction.quizQuestionPlacement.aggregate({ where: { quizId }, _max: { position: true } }),
+        transaction.quizQuestion.aggregate({ where: { placements: { some: { quizId } } }, _sum: { points: true } }),
       ]);
       if (!quiz || !question) throw new Error("NOT_FOUND");
+      if (!canAddQuizPoints(total._sum.points ?? 0, question.points)) throw new Error("TOTAL_POINTS_EXCEEDED");
       await transaction.quizQuestionPlacement.create({ data: { quizId, questionId, position: (maximum._max.position ?? -1) + 1 } });
       await transaction.auditLog.create({ data: { actorId: user.id, organizationId, action: "QUIZ_BANK_QUESTION_REUSED", targetType: "QUIZ_QUESTION", targetId: questionId, metadata: { quizId } } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
