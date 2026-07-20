@@ -11,9 +11,9 @@ ALTER TABLE "internal_challenges"
   ADD COLUMN "instance_memory_mb" INTEGER,
   ADD COLUMN "instance_lifetime_minutes" INTEGER,
   ADD CONSTRAINT "internal_challenges_instance_check" CHECK (
-    ("mode" = 'PERSONAL_INSTANCE' AND "instance_template_ref" IS NOT NULL AND "instance_cpu_milli" BETWEEN 100 AND 2000 AND "instance_memory_mb" BETWEEN 64 AND 2048 AND "instance_lifetime_minutes" BETWEEN 5 AND 120 AND "protocol" IS NULL AND "host" IS NULL AND "port" IS NULL)
+    ("mode"::TEXT = 'PERSONAL_INSTANCE' AND "instance_template_ref" IS NOT NULL AND "instance_cpu_milli" BETWEEN 100 AND 2000 AND "instance_memory_mb" BETWEEN 64 AND 2048 AND "instance_lifetime_minutes" BETWEEN 5 AND 120 AND "protocol" IS NULL AND "host" IS NULL AND "port" IS NULL)
     OR
-    ("mode" <> 'PERSONAL_INSTANCE' AND "instance_template_ref" IS NULL AND "instance_cpu_milli" IS NULL AND "instance_memory_mb" IS NULL AND "instance_lifetime_minutes" IS NULL)
+    ("mode"::TEXT <> 'PERSONAL_INSTANCE' AND "instance_template_ref" IS NULL AND "instance_cpu_milli" IS NULL AND "instance_memory_mb" IS NULL AND "instance_lifetime_minutes" IS NULL)
   );
 
 CREATE TABLE "notification_preferences" (
