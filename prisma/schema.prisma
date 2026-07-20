@@ -47,6 +47,7 @@ enum AssignmentFieldType {
 enum AssignmentItemType {
   EXTERNAL_CHALLENGE
   INTERNAL_CTF
+  QUIZ
 }
 
 enum ExternalChallengeSource {
@@ -75,6 +76,29 @@ enum ChallengeConnectionProtocol {
   HTTP
   TCP
   SSH
+}
+
+enum QuizQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  SHORT_TEXT
+  LONG_TEXT
+  FLAG
+  FILE
+}
+
+enum QuizAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  GRADED
+}
+
+enum QuizResultRelease {
+  IMMEDIATE
+  AFTER_DEADLINE
+  AFTER_GRADING
+  HIDDEN
 }
 
 enum SubmissionStatus {
@@ -177,6 +201,9 @@ model User {
   mentorRelations      MentorRelation[]      @relation("MentorRelationMentor")
   menteeRelations      MentorRelation[]      @relation("MentorRelationMentee")
   challengeSubmissions ChallengeSubmission[]
+  quizQuestions        QuizQuestion[]       @relation("QuizQuestionCreator")
+  quizAttempts         QuizAttempt[]
+  gradedQuizAnswers    QuizAnswer[]         @relation("QuizAnswerGrader")
 
   @@map("users")
 }
@@ -199,6 +226,7 @@ model Organization {
   calendarEvents  CalendarEvent[]
   questions       Question[]
   mentorRelations MentorRelation[]
+  quizQuestions   QuizQuestion[]
 
   @@index([createdById])
   @@map("organizations")
@@ -363,6 +391,7 @@ model AssignmentItem {
   assignment           Assignment            @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   externalChallenge    ExternalChallenge?
   internalChallenge    InternalChallenge?
+  quiz                 Quiz?
   challengeGrading     ChallengeGrading?
   challengeSubmissions ChallengeSubmission[]
 
@@ -487,6 +516,144 @@ model ChallengeAttempt {
   @@index([itemId, submittedAt])
   @@index([userId, submittedAt])
   @@map("challenge_attempts")
+}
+
+model Quiz {
+  assignmentItemId String                  @id @map("assignment_item_id") @db.Uuid
+  title            String                  @db.VarChar(160)
+  description      String                  @db.Text
+  timeLimitMinutes Int?                    @map("time_limit_minutes")
+  attemptLimit     Int                     @default(1) @map("attempt_limit")
+  passingScore     Int?                    @map("passing_score")
+  shuffleQuestions Boolean                 @default(false) @map("shuffle_questions")
+  shuffleChoices   Boolean                 @default(false) @map("shuffle_choices")
+  resultRelease    QuizResultRelease       @default(AFTER_GRADING) @map("result_release")
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignmentItem   AssignmentItem          @relation(fields: [assignmentItemId], references: [id], onDelete: Cascade)
+  questions        QuizQuestionPlacement[]
+  attempts         QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id                String                  @id @default(uuid()) @db.Uuid
+  organizationId    String                  @map("organization_id") @db.Uuid
+  createdById       String                  @map("created_by_id") @db.Uuid
+  type              QuizQuestionType
+  prompt            String                  @db.Text
+  description       String?                 @db.Text
+  points            Int
+  required          Boolean                 @default(true)
+  difficulty        String                  @db.VarChar(40)
+  tags              String[]                @default([])
+  explanation       String?                 @db.Text
+  caseSensitive     Boolean                 @default(false) @map("case_sensitive")
+  trimWhitespace    Boolean                 @default(true) @map("trim_whitespace")
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy         User                    @relation("QuizQuestionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  choices           QuizChoice[]
+  acceptedAnswers   QuizAcceptedAnswer[]
+  placements        QuizQuestionPlacement[]
+  answers           QuizAnswer[]
+
+  @@index([organizationId, type, createdAt])
+  @@index([tags], type: Gin)
+  @@map("quiz_questions")
+}
+
+model QuizChoice {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  content    String       @db.VarChar(1000)
+  isCorrect  Boolean      @map("is_correct")
+  position   Int
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, position])
+  @@map("quiz_choices")
+}
+
+model QuizAcceptedAnswer {
+  id         String       @id @default(uuid()) @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  digest     String       @db.Char(64)
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, digest])
+  @@map("quiz_accepted_answers")
+}
+
+model QuizQuestionPlacement {
+  quizId     String       @map("quiz_id") @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  position   Int
+  quiz       Quiz         @relation(fields: [quizId], references: [assignmentItemId], onDelete: Cascade)
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@id([quizId, questionId])
+  @@unique([quizId, position])
+  @@map("quiz_question_placements")
+}
+
+model QuizAttempt {
+  id            String            @id @default(uuid()) @db.Uuid
+  quizId        String            @map("quiz_id") @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  attemptNumber Int               @map("attempt_number")
+  status        QuizAttemptStatus @default(IN_PROGRESS)
+  startedAt     DateTime          @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt     DateTime?         @map("expires_at") @db.Timestamptz(6)
+  submittedAt   DateTime?         @map("submitted_at") @db.Timestamptz(6)
+  autoSubmitted Boolean           @default(false) @map("auto_submitted")
+  score         Int?
+  maxScore      Int               @map("max_score")
+  passed        Boolean?
+  questionOrder Json              @map("question_order")
+  choiceOrder   Json              @map("choice_order")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  quiz          Quiz              @relation(fields: [quizId], references: [assignmentItemId], onDelete: Restrict)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  answers       QuizAnswer[]
+
+  @@unique([quizId, userId, attemptNumber])
+  @@index([quizId, status, submittedAt])
+  @@index([userId, updatedAt])
+  @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id         String       @id @default(uuid()) @db.Uuid
+  attemptId  String       @map("attempt_id") @db.Uuid
+  questionId String       @map("question_id") @db.Uuid
+  response   Json
+  score      Int?
+  feedback   String?      @db.Text
+  gradedById String?      @map("graded_by_id") @db.Uuid
+  gradedAt   DateTime?    @map("graded_at") @db.Timestamptz(6)
+  savedAt    DateTime     @updatedAt @map("saved_at") @db.Timestamptz(6)
+  attempt    QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  gradedBy   User?        @relation("QuizAnswerGrader", fields: [gradedById], references: [id], onDelete: Restrict)
+  file       QuizAnswerFile?
+
+  @@unique([attemptId, questionId])
+  @@index([questionId, gradedAt])
+  @@map("quiz_answers")
+}
+
+model QuizAnswerFile {
+  answerId         String     @id @map("answer_id") @db.Uuid
+  storagePath      String     @unique @map("storage_path") @db.VarChar(500)
+  originalFilename String     @map("original_filename") @db.VarChar(255)
+  mimeType         String     @map("mime_type") @db.VarChar(150)
+  sizeBytes        BigInt     @map("size_bytes")
+  answer           QuizAnswer @relation(fields: [answerId], references: [id], onDelete: Restrict)
+
+  @@map("quiz_answer_files")
 }
 
 model Submission {

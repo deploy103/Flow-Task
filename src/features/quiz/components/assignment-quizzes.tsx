@@ -1,0 +1,12 @@
+import { AssignmentItemType } from "@prisma/client";
+import { ClipboardList, Plus } from "lucide-react";
+import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
+
+export async function AssignmentQuizzes({ organizationId, assignmentId, userId, canManage, canReview }: { organizationId: string; assignmentId: string; userId: string; canManage: boolean; canReview: boolean }) {
+  const items = await prisma.assignmentItem.findMany({ where: { assignmentId, type: AssignmentItemType.QUIZ }, orderBy: { position: "asc" }, select: { id: true, quiz: { select: { title: true, description: true, timeLimitMinutes: true, attemptLimit: true, _count: { select: { questions: true } }, attempts: { where: { userId }, orderBy: { attemptNumber: "desc" }, take: 1, select: { status: true, score: true, maxScore: true } } } } } });
+  const quizzes = items.filter((item) => item.quiz);
+  if (!quizzes.length && !canManage) return null;
+  return <section className="mt-5"><Card><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-lg font-bold"><ClipboardList size={20} /> 온라인 퀴즈</h2><p className="mt-1 text-sm text-slate-500">답안은 문제별로 자동 저장됩니다.</p></div>{canManage && <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white" href={`/organizations/${organizationId}/assignments/${assignmentId}/quiz/new`}><Plus size={17} /> 퀴즈 추가</Link>}</div><div className="mt-4 space-y-3">{quizzes.map((item) => { const quiz = item.quiz!; const latest = quiz.attempts[0]; return <Link className="block rounded-xl border border-slate-200 p-4 hover:border-indigo-400 dark:border-slate-700" href={`/organizations/${organizationId}/assignments/${assignmentId}/quiz/${item.id}`} key={item.id}><div className="flex flex-wrap justify-between gap-2"><strong>{quiz.title}</strong><span className="text-xs text-slate-500">{quiz._count.questions}문항 · {quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes}분` : "시간 제한 없음"}</span></div><p className="mt-1 line-clamp-2 text-sm text-slate-500">{quiz.description}</p>{latest && <p className="mt-2 text-xs font-semibold text-indigo-600">최근 응시: {latest.status}{latest.score !== null ? ` · ${latest.score}/${latest.maxScore}점` : ""}</p>}</Link>; })}{!quizzes.length && <p className="text-sm text-slate-500">등록된 퀴즈가 없습니다.</p>}</div>{(canManage || canReview) && quizzes.length > 0 && <p className="mt-3 text-xs text-slate-500">각 퀴즈 화면에서 응시 결과와 문항 구성을 관리할 수 있습니다.</p>}</Card></section>;
+}
