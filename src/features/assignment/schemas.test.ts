@@ -63,8 +63,8 @@ describe("assignment schemas", () => {
     ).toBe(false);
   });
 
-  it("requires one to three unique supported submission fields", () => {
-    expect(assignmentFieldTypesSchema.safeParse([]).success).toBe(false);
+  it("accepts zero to three unique supported submission fields", () => {
+    expect(assignmentFieldTypesSchema.safeParse([]).success).toBe(true);
     expect(
       assignmentFieldTypesSchema.safeParse([
         AssignmentFieldType.TEXT,

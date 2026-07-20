@@ -106,6 +106,5 @@ export const assignmentTargetIdsSchema = z.array(z.uuid()).max(MAX_ASSIGNMENT_TA
 export const assignmentOrganizationIdSchema = z.uuid();
 export const assignmentFieldTypesSchema = z
   .array(z.enum([AssignmentFieldType.TEXT, AssignmentFieldType.FILE, AssignmentFieldType.LINK]))
-  .min(1)
   .max(3)
   .refine((types) => new Set(types).size === types.length, "제출 항목은 중복될 수 없습니다.");
