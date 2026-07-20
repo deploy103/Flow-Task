@@ -21,7 +21,7 @@ import { hashChallengeFlag, verifyChallengeFlag } from "./flag";
 import { resolveChallengeAttempt } from "./grading";
 import {
   createExternalChallengeSchema,
-  submitExternalChallengeSchema,
+  submitChallengeSchema,
 } from "./schemas";
 
 const challengeContextSchema = z.object({
@@ -207,11 +207,11 @@ export async function createExternalChallenge(formData: FormData) {
   );
 }
 
-export async function submitExternalChallenge(formData: FormData) {
+export async function submitChallenge(formData: FormData) {
   const context = parseChallengeContext(formData);
   if (!context.success) redirect("/dashboard?challenge_error=invalid_input");
 
-  const parsed = submitExternalChallengeSchema.safeParse(Object.fromEntries(formData));
+  const parsed = submitChallengeSchema.safeParse(Object.fromEntries(formData));
   const { organizationId, assignmentId } = context.data;
   if (!parsed.success) {
     assignmentChallengeRedirect(organizationId, assignmentId, { error: "invalid_input" });
@@ -229,7 +229,9 @@ export async function submitExternalChallenge(formData: FormData) {
           where: {
             id: parsed.data.itemId,
             assignmentId,
-            type: AssignmentItemType.EXTERNAL_CHALLENGE,
+            type: {
+              in: [AssignmentItemType.EXTERNAL_CHALLENGE, AssignmentItemType.INTERNAL_CTF],
+            },
             assignment: { organizationId, archivedAt: null },
           },
           select: {
@@ -247,6 +249,7 @@ export async function submitExternalChallenge(formData: FormData) {
               },
             },
             externalChallenge: { select: { points: true } },
+            internalChallenge: { select: { points: true } },
             challengeGrading: {
               select: {
                 flagDigest: true,
@@ -260,7 +263,8 @@ export async function submitExternalChallenge(formData: FormData) {
             },
           },
         });
-        if (!item?.externalChallenge || !item.challengeGrading) {
+        const challengePoints = item?.externalChallenge?.points ?? item?.internalChallenge?.points;
+        if (!item || challengePoints === undefined || !item.challengeGrading) {
           return { status: "error", itemId: parsed.data.itemId, error: "item_not_found" } as const;
         }
 
@@ -343,7 +347,7 @@ export async function submitExternalChallenge(formData: FormData) {
           where: { itemId: item.id, userId: user.id, isCorrect: false },
         });
         const attemptResult = resolveChallengeAttempt({
-          points: item.externalChallenge.points,
+          points: challengePoints,
           penaltyPerWrongAttempt: item.challengeGrading.penaltyPerWrongAttempt,
           previousWrongAttempts,
           requiresCorrectFlag,
