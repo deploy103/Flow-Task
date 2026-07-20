@@ -9,7 +9,7 @@ import {
   EXTERNAL_CHALLENGE_SOURCE_LABELS,
   MAX_CHALLENGE_WRITEUP_LENGTH,
 } from "@/constants/challenge";
-import { submitExternalChallenge } from "@/features/challenge/actions";
+import { submitChallenge } from "@/features/challenge/actions";
 import {
   getChallengeAttemptAccess,
   type ChallengeAttemptAccessReason,
@@ -243,7 +243,7 @@ export async function AssignmentChallenges({
               {itemSuccess && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200" role="status">{itemSuccess}</p>}
 
               {access === "ALLOWED" ? (
-                <form action={submitExternalChallenge} className="mt-5 space-y-4">
+                <form action={submitChallenge} className="mt-5 space-y-4">
                   <input name="organizationId" type="hidden" value={organizationId} />
                   <input name="assignmentId" type="hidden" value={assignmentId} />
                   <input name="itemId" type="hidden" value={item.id} />
