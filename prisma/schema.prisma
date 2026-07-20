@@ -46,6 +46,7 @@ enum AssignmentFieldType {
 
 enum AssignmentItemType {
   EXTERNAL_CHALLENGE
+  INTERNAL_CTF
 }
 
 enum ExternalChallengeSource {
@@ -62,6 +63,18 @@ enum ChallengeCategory {
   NETWORK
   PROGRAMMING
   OTHER
+}
+
+enum InternalChallengeMode {
+  STATIC_FILE
+  SHARED_SERVER
+}
+
+enum ChallengeConnectionProtocol {
+  HTTPS
+  HTTP
+  TCP
+  SSH
 }
 
 enum SubmissionStatus {
@@ -349,6 +362,7 @@ model AssignmentItem {
   updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   assignment           Assignment            @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   externalChallenge    ExternalChallenge?
+  internalChallenge    InternalChallenge?
   challengeGrading     ChallengeGrading?
   challengeSubmissions ChallengeSubmission[]
 
@@ -373,6 +387,52 @@ model ExternalChallenge {
 
   @@index([source, category])
   @@map("external_challenges")
+}
+
+model InternalChallenge {
+  assignmentItemId String                       @id @map("assignment_item_id") @db.Uuid
+  title            String                       @db.VarChar(160)
+  description      String                       @db.Text
+  category         ChallengeCategory
+  difficulty       String                       @db.VarChar(40)
+  points           Int
+  mode             InternalChallengeMode
+  protocol         ChallengeConnectionProtocol?
+  host             String?                      @db.VarChar(253)
+  port             Int?
+  createdAt        DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignmentItem   AssignmentItem               @relation(fields: [assignmentItemId], references: [id], onDelete: Cascade)
+  hints            ChallengeHint[]
+  resources        ChallengeResource[]
+
+  @@index([mode, category])
+  @@map("internal_challenges")
+}
+
+model ChallengeHint {
+  id                String            @id @default(uuid()) @db.Uuid
+  assignmentItemId  String            @map("assignment_item_id") @db.Uuid
+  content           String            @db.VarChar(1000)
+  position          Int
+  internalChallenge InternalChallenge @relation(fields: [assignmentItemId], references: [assignmentItemId], onDelete: Cascade)
+
+  @@unique([assignmentItemId, position])
+  @@map("challenge_hints")
+}
+
+model ChallengeResource {
+  id                String            @id @default(uuid()) @db.Uuid
+  assignmentItemId  String            @map("assignment_item_id") @db.Uuid
+  storagePath       String            @unique @map("storage_path") @db.VarChar(500)
+  originalFilename  String            @map("original_filename") @db.VarChar(255)
+  mimeType          String            @map("mime_type") @db.VarChar(150)
+  sizeBytes         BigInt            @map("size_bytes")
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  internalChallenge InternalChallenge @relation(fields: [assignmentItemId], references: [assignmentItemId], onDelete: Restrict)
+
+  @@index([assignmentItemId])
+  @@map("challenge_resources")
 }
 
 model ChallengeGrading {
