@@ -196,5 +196,4 @@ export const submitChallengeSchema = z
     }
   });
 
-export const submitExternalChallengeSchema = submitChallengeSchema;
 export const challengeItemIdSchema = z.uuid();

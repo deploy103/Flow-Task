@@ -14,6 +14,7 @@ import {
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { canViewAssignment, isAssignmentPublished } from "@/features/assignment/visibility";
 import { AssignmentChallenges } from "@/features/challenge/components/assignment-challenges";
+import { InternalChallenges } from "@/features/challenge/components/internal-challenges";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization, canReviewSubmissions } from "@/features/organization/permissions";
 import { canSubmitAssignment } from "@/features/submission/access";
@@ -200,6 +201,19 @@ export default async function AssignmentDetailPage({
           success: query.challenge_success,
           itemId: query.challenge_item,
         }}
+        opensAt={assignment.opensAt}
+        organizationId={organizationId}
+        userId={user.id}
+      />
+
+      <InternalChallenges
+        allowLate={assignment.allowLate}
+        assignmentId={assignmentId}
+        canManage={canManage}
+        canReview={canReview}
+        canSubmit={canSubmit}
+        deadline={assignment.deadline}
+        feedback={{ error: query.challenge_error, success: query.challenge_success, itemId: query.challenge_item }}
         opensAt={assignment.opensAt}
         organizationId={organizationId}
         userId={user.id}
