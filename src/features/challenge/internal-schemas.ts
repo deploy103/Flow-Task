@@ -61,6 +61,10 @@ export const createInternalChallengeSchema = z
       z.string().trim().max(MAX_CHALLENGE_HOST_LENGTH).regex(HOST_PATTERN).optional(),
     ),
     port: optionalInteger(MIN_CHALLENGE_PORT, MAX_CHALLENGE_PORT),
+    instanceTemplateRef: z.preprocess(emptyToUndefined, z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/).optional()),
+    instanceCpuMilli: optionalInteger(100, 2_000),
+    instanceMemoryMb: optionalInteger(64, 2_048),
+    instanceLifetimeMinutes: optionalInteger(5, 120),
     hints: z.preprocess(emptyToUndefined, z.string().max((MAX_CHALLENGE_HINT_LENGTH + 2) * MAX_CHALLENGE_HINT_COUNT).optional()),
     flag: z.preprocess(
       emptyToUndefined,
@@ -86,6 +90,11 @@ export const createInternalChallengeSchema = z
       if (!data.host) context.addIssue({ code: "custom", path: ["host"], message: "호스트가 필요합니다." });
       if (!data.port) context.addIssue({ code: "custom", path: ["port"], message: "포트가 필요합니다." });
     } else if (data.protocol || data.host || data.port) {
-      context.addIssue({ code: "custom", path: ["mode"], message: "정적 파일형에는 접속 정보를 설정할 수 없습니다." });
+      context.addIssue({ code: "custom", path: ["mode"], message: "공용 서버형에만 고정 접속 정보를 설정할 수 있습니다." });
+    }
+    if (data.mode === InternalChallengeMode.PERSONAL_INSTANCE) {
+      if (!data.instanceTemplateRef || !data.instanceCpuMilli || !data.instanceMemoryMb || !data.instanceLifetimeMinutes) context.addIssue({ code: "custom", path: ["instanceTemplateRef"], message: "개인 인스턴스 정책이 필요합니다." });
+    } else if (data.instanceTemplateRef || data.instanceCpuMilli || data.instanceMemoryMb || data.instanceLifetimeMinutes) {
+      context.addIssue({ code: "custom", path: ["mode"], message: "개인 인스턴스형에만 실행 정책을 설정할 수 있습니다." });
     }
   });

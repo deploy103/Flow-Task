@@ -3,10 +3,12 @@ import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { MembershipStatus, SystemRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { syncAssignmentNotifications } from "@/features/notification/queries";
+import { queueNotificationDeliveries } from "@/features/notification/delivery";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuthenticatedUser();
   await syncAssignmentNotifications(user.id);
+  await queueNotificationDeliveries(user.id);
   const unreadNotifications = await prisma.notification.count({
     where: { userId: user.id, readAt: null },
   });

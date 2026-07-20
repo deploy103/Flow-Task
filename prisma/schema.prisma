@@ -69,6 +69,41 @@ enum ChallengeCategory {
 enum InternalChallengeMode {
   STATIC_FILE
   SHARED_SERVER
+  PERSONAL_INSTANCE
+}
+
+enum ChallengeInstanceStatus {
+  STARTING
+  RUNNING
+  STOPPED
+  EXPIRED
+  FAILED
+}
+
+enum OrganizationIntegrationKind {
+  DISCORD_WEBHOOK
+  GENERIC_WEBHOOK
+  EMAIL_RELAY
+}
+
+enum NotificationChannel {
+  EMAIL
+  WEB_PUSH
+  DISCORD
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum QuizIntegrityEventType {
+  TAB_HIDDEN
+  WINDOW_BLUR
+  COPY
+  PASTE
+  IP_CHANGED
 }
 
 enum ChallengeConnectionProtocol {
@@ -204,6 +239,10 @@ model User {
   quizQuestions        QuizQuestion[]       @relation("QuizQuestionCreator")
   quizAttempts         QuizAttempt[]
   gradedQuizAnswers    QuizAnswer[]         @relation("QuizAnswerGrader")
+  notificationPreference NotificationPreference?
+  webPushSubscriptions WebPushSubscription[]
+  challengeInstances   ChallengeInstance[]
+  createdIntegrations  OrganizationIntegration[] @relation("IntegrationCreator")
 
   @@map("users")
 }
@@ -227,6 +266,7 @@ model Organization {
   questions       Question[]
   mentorRelations MentorRelation[]
   quizQuestions   QuizQuestion[]
+  integrations    OrganizationIntegration[]
 
   @@index([createdById])
   @@map("organizations")
@@ -429,11 +469,16 @@ model InternalChallenge {
   protocol         ChallengeConnectionProtocol?
   host             String?                      @db.VarChar(253)
   port             Int?
+  instanceTemplateRef String?                    @map("instance_template_ref") @db.VarChar(160)
+  instanceCpuMilli Int?                          @map("instance_cpu_milli")
+  instanceMemoryMb Int?                          @map("instance_memory_mb")
+  instanceLifetimeMinutes Int?                   @map("instance_lifetime_minutes")
   createdAt        DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
   assignmentItem   AssignmentItem               @relation(fields: [assignmentItemId], references: [id], onDelete: Cascade)
   hints            ChallengeHint[]
   resources        ChallengeResource[]
+  instances        ChallengeInstance[]
 
   @@index([mode, category])
   @@map("internal_challenges")
@@ -618,6 +663,7 @@ model QuizAttempt {
   quiz          Quiz              @relation(fields: [quizId], references: [assignmentItemId], onDelete: Restrict)
   user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
   answers       QuizAnswer[]
+  integrityEvents QuizIntegrityEvent[]
 
   @@unique([quizId, userId, attemptNumber])
   @@index([quizId, status, submittedAt])
@@ -788,11 +834,115 @@ model Notification {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deliveries     NotificationDelivery[]
 
   @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
   @@index([organizationId, createdAt])
   @@map("notifications")
+}
+
+model NotificationPreference {
+  userId          String   @id @map("user_id") @db.Uuid
+  emailEnabled    Boolean  @default(false) @map("email_enabled")
+  webPushEnabled  Boolean  @default(false) @map("web_push_enabled")
+  discordEnabled  Boolean  @default(false) @map("discord_enabled")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model WebPushSubscription {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  endpoint     String   @db.VarChar(2048)
+  endpointHash String   @unique @map("endpoint_hash") @db.Char(64)
+  p256dh       String   @db.VarChar(180)
+  auth         String   @db.VarChar(80)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt   DateTime @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("web_push_subscriptions")
+}
+
+model NotificationDelivery {
+  id            String                     @id @default(uuid()) @db.Uuid
+  notificationId String                    @map("notification_id") @db.Uuid
+  channel       NotificationChannel
+  status        NotificationDeliveryStatus @default(PENDING)
+  attempts      Int                        @default(0)
+  nextAttemptAt DateTime                   @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  deliveredAt   DateTime?                  @map("delivered_at") @db.Timestamptz(6)
+  lastError     String?                    @map("last_error") @db.VarChar(80)
+  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  notification  Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  @@index([status, nextAttemptAt])
+  @@map("notification_deliveries")
+}
+
+model OrganizationIntegration {
+  id                  String                      @id @default(uuid()) @db.Uuid
+  organizationId      String                      @map("organization_id") @db.Uuid
+  createdById         String                      @map("created_by_id") @db.Uuid
+  kind                OrganizationIntegrationKind
+  name                String                      @db.VarChar(80)
+  endpointCiphertext  String                      @map("endpoint_ciphertext") @db.Text
+  secretCiphertext    String?                     @map("secret_ciphertext") @db.Text
+  enabled             Boolean                     @default(true)
+  createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy           User                        @relation("IntegrationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, kind, name])
+  @@index([organizationId, enabled])
+  @@map("organization_integrations")
+}
+
+model ChallengeInstance {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  assignmentItemId    String                  @map("assignment_item_id") @db.Uuid
+  userId              String                  @map("user_id") @db.Uuid
+  status              ChallengeInstanceStatus @default(STARTING)
+  providerReference   String?                 @unique @map("provider_reference") @db.VarChar(180)
+  connectionHost      String?                 @map("connection_host") @db.VarChar(253)
+  connectionPort      Int?                    @map("connection_port")
+  connectionProtocol  ChallengeConnectionProtocol? @map("connection_protocol")
+  idempotencyKey      String                  @unique @map("idempotency_key") @db.Char(64)
+  startedAt           DateTime                @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt           DateTime                @map("expires_at") @db.Timestamptz(6)
+  stoppedAt           DateTime?               @map("stopped_at") @db.Timestamptz(6)
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  challenge           InternalChallenge       @relation(fields: [assignmentItemId], references: [assignmentItemId], onDelete: Restrict)
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentItemId, userId, status])
+  @@index([status, expiresAt])
+  @@map("challenge_instances")
+}
+
+model QuizIntegrityEvent {
+  id             String                     @id @default(uuid()) @db.Uuid
+  attemptId      String                     @map("attempt_id") @db.Uuid
+  type           QuizIntegrityEventType
+  dedupeKey      String                     @map("dedupe_key") @db.VarChar(120)
+  clientIpDigest String?                    @map("client_ip_digest") @db.Char(64)
+  detail         Json                       @default("{}")
+  occurredAt     DateTime                   @map("occurred_at") @db.Timestamptz(6)
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  attempt        QuizAttempt                @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, dedupeKey])
+  @@index([attemptId, occurredAt])
+  @@map("quiz_integrity_events")
 }
 
 model CalendarEvent {
