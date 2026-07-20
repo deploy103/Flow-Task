@@ -212,6 +212,7 @@ export async function gradeQuizAnswer(formData: FormData) {
   if (!canReviewSubmissions({ systemRole: user.systemRole, membership })) redirect("/dashboard?quiz_error=forbidden");
   try {
     await prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT "id" FROM "quiz_attempts" WHERE "id" = ${attemptId}::uuid FOR UPDATE`;
       const answer = await transaction.quizAnswer.findFirst({ where: { id: answerId, attemptId, attempt: { quizId, status: { not: QuizAttemptStatus.IN_PROGRESS }, quiz: { assignmentItem: { assignmentId, assignment: { organizationId } } } }, question: { type: { in: MANUAL_TYPES } } }, select: { id: true, question: { select: { points: true } } } });
       if (!answer || parsed.data.score > answer.question.points) throw new Error("INVALID_SCORE");
       await transaction.quizAnswer.update({ where: { id: answer.id }, data: { score: parsed.data.score, feedback: parsed.data.feedback ?? null, gradedById: user.id, gradedAt: new Date() } });
@@ -223,7 +224,7 @@ export async function gradeQuizAnswer(formData: FormData) {
         await transaction.quizAttempt.update({ where: { id: attemptId }, data: { status: QuizAttemptStatus.GRADED, score, passed: attempt.quiz.passingScore !== null ? score >= attempt.quiz.passingScore : null } });
       }
       await transaction.auditLog.create({ data: { actorId: user.id, organizationId, action: "QUIZ_ANSWER_GRADED", targetType: "QUIZ_ANSWER", targetId: answer.id, metadata: { attemptId, score: parsed.data.score } } });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch { redirect(`${attemptPath(organizationId, assignmentId, quizId)}/results?error=grade_failed`); }
   redirect(`${attemptPath(organizationId, assignmentId, quizId)}/results?success=graded`);
 }
