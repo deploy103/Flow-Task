@@ -43,6 +43,7 @@ export const CHALLENGE_CATEGORY_LABELS = {
 export const INTERNAL_CHALLENGE_MODE_LABELS = {
   [InternalChallengeMode.STATIC_FILE]: "정적 파일형",
   [InternalChallengeMode.SHARED_SERVER]: "공용 서버형",
+  [InternalChallengeMode.PERSONAL_INSTANCE]: "개인 인스턴스형",
 } satisfies Record<InternalChallengeMode, string>;
 
 export const CHALLENGE_CONNECTION_PROTOCOL_LABELS = {
