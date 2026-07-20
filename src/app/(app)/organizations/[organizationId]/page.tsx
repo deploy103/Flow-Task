@@ -1,5 +1,5 @@
 import { MembershipStatus } from "@prisma/client";
-import { ArrowRight, Bell, CalendarDays, CircleHelp, ClipboardList, Settings, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Bell, CalendarDays, CircleHelp, ClipboardList, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,8 @@ export default async function OrganizationPage({ params }: { params: Promise<{ o
         {canManage && <Link href={`/organizations/${organizationId}/members`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Settings size={18} /> 구성원 관리</Link>}
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
+        {canManage && <Link href={`/organizations/${organizationId}/statistics`} className="block"><Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-cyan-50 p-3 text-cyan-600 dark:bg-cyan-950"><BarChart3 /></span><ArrowRight className="text-slate-400" /></div><h2 className="mt-5 font-bold">통계와 Excel</h2><p className="mt-1 text-sm text-slate-500">제출률·정답률·질문 응답 현황을 확인합니다.</p></Card></Link>}
+        {canManage && <Link href={`/organizations/${organizationId}/integrations`} className="block"><Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-fuchsia-50 p-3 text-fuchsia-600 dark:bg-fuchsia-950"><Settings /></span><ArrowRight className="text-slate-400" /></div><h2 className="mt-5 font-bold">외부 연동</h2><p className="mt-1 text-sm text-slate-500">Discord·이메일·외부 API를 암호화 설정합니다.</p></Card></Link>}
         <Link href={`/organizations/${organizationId}/assignments`} className="block">
           <Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-950"><ClipboardList /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div><h2 className="mt-5 font-bold">과제</h2><p className="mt-1 text-sm text-slate-500">공개된 과제와 마감 일정을 확인하세요.</p></Card>
         </Link>

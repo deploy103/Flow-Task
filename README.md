@@ -23,6 +23,8 @@
 - DreamHack·외부 워게임 문제 구성, HMAC 플래그 자동 채점, 풀이·라이트업 제출과 문제별 현황
 - 정적 파일·공용 서버형 자체 CTF 문제, 힌트, 비공개 문제 자료와 플래그 자동 채점
 - 문제은행 기반 온라인 퀴즈, 6개 문항 유형, 문항별 자동 저장, 제한 시간·응시 횟수, 자동·수동 채점
+- 원격 격리 제공자 기반 개인 CTF 인스턴스, Discord·이메일·웹 푸시 알림, 외부 API 연동
+- 관리자 통계 대시보드와 Excel 내보내기, 퀴즈 무결성 참고 기록, 설치 가능한 PWA
 
 ## 로컬 실행
 
@@ -47,6 +49,14 @@ npm run dev
 자체 CTF 문제 자료도 같은 비공개 Storage 버킷에 무작위 경로로 저장합니다. 초기 버전은 Server Action 전역 제한보다 작은 파일 하나(최대 512KB)를 지원하며, 실행 파일은 허용된 ZIP 형식으로 묶어 등록해야 합니다. 다운로드 요청마다 활성 조직 소속, 과제 대상, 공개일과 검토 권한을 다시 검사합니다. 공용 서버형은 시스템이 서버에 접속하지 않고 관리자가 등록한 프로토콜·호스트·포트만 대상자에게 제공합니다.
 
 온라인 퀴즈는 단일·복수 선택, 단답형, 서술형, 플래그, 파일 답안을 지원합니다. 문제와 선택지 순서는 응시 시작 시 스냅샷으로 고정하고 문항별 답안을 자동 저장하며, 제한 시간 만료 시 자동 제출합니다. 단답형과 플래그 정답도 `CHALLENGE_FLAG_PEPPER`로 도메인 분리된 HMAC-SHA256 digest만 저장합니다. 파일 답안은 같은 비공개 Storage 버킷의 무작위 경로에 최대 512KB로 저장하고, 소유자 또는 활성 검토자만 다운로드할 수 있습니다.
+
+개인 CTF 인스턴스는 애플리케이션 서버의 Docker socket을 사용하지 않습니다. `INSTANCE_PROVIDER_URL`의 HTTPS 원격 격리 제공자에 운영자가 미리 승인한 불투명 템플릿 ID와 CPU·메모리·수명 상한만 전달합니다. 제공자 호스트는 `EXTERNAL_SERVICE_ALLOWED_HOSTS`에 등록해야 하며 인스턴스 제공자도 전달받은 수명 뒤 컨테이너를 강제 종료해야 합니다.
+
+외부 알림은 `INTEGRATION_ENCRYPTION_KEY`로 조직별 Discord Webhook·이메일 릴레이·일반 Webhook 주소와 자격 증명을 AES-256-GCM 암호화해 저장합니다. `NOTIFICATION_DELIVERY_SECRET`으로 보호된 `/api/internal/maintenance/notification-deliveries`를 주기 호출하면 전달 큐가 이메일, Web Push, Discord를 최대 5회 재시도합니다. Web Push에는 `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`가 필요합니다. 실제 URL·키·Webhook은 저장소에 커밋하지 않습니다.
+
+`Notification delivery` 워크플로를 사용하려면 GitHub Actions Secret `NOTIFICATION_DELIVERY_URL`에 배포된 HTTPS API 전체 주소를, `NOTIFICATION_DELIVERY_SECRET`에 서버와 같은 비밀값을 등록합니다. 워크플로는 리다이렉트와 HTTPS 외 프로토콜을 거부하고 5분마다 전달 큐를 처리합니다.
+
+퀴즈의 탭 숨김, 창 이탈, 복사·붙여넣기, IP 변경은 관리자 참고 기록일 뿐 자동 부정행위 판정이나 제재에 사용하지 않습니다. IP 원문은 저장하지 않고 `CHALLENGE_FLAG_PEPPER`로 도메인 분리한 HMAC digest만 기록합니다. PWA 서비스 워커는 인증 HTML과 API 응답을 캐시하지 않고 동일 출처 정적 자산만 캐시합니다.
 
 업로드 권한은 15분 안에 제출에 연결해야 하며 사용자별 10분당 발급 횟수·누적 용량, 미소비 signed token의 실제 수명이 끝날 때까지 유지되는 예약량과 조직별 누적·대기 용량 제한을 적용합니다. Supabase signed upload의 2시간 유효기간과 10분의 시계 오차 여유가 지난 미소비 객체는 사용자 소속이나 과제 상태와 무관한 janitor가 정리합니다. 삭제 실패는 DB에 횟수·시각·안전한 오류 코드를 기록하고 다음 실행에서 재시도합니다.
 

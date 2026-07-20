@@ -1,4 +1,4 @@
-import { AssignmentItemType, ChallengeConnectionProtocol } from "@prisma/client";
+import { AssignmentItemType, ChallengeConnectionProtocol, InternalChallengeMode } from "@prisma/client";
 import { Download, Flag, Lightbulb, ListChecks, Plus, Server } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
 } from "@/constants/challenge";
 import { getChallengeAttemptAccess, type ChallengeAttemptAccessReason } from "../access";
 import { submitChallenge } from "../actions";
+import { startChallengeInstance, stopChallengeInstance } from "../instance-actions";
 import { prisma } from "@/lib/prisma";
 
 const ACCESS_MESSAGES: Record<Exclude<ChallengeAttemptAccessReason, "ALLOWED">, string> = {
@@ -30,6 +31,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   already_completed: "이미 완료한 문제입니다.",
   attempt_limit: "최대 시도 횟수를 모두 사용했습니다.",
   submit_failed: "제출을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  instance_forbidden: "현재 개인 인스턴스를 시작할 수 없습니다.",
+  instance_start_failed: "격리 실행 제공자가 인스턴스를 시작하지 못했습니다.",
+  instance_not_found: "종료할 활성 인스턴스가 없습니다.",
+  instance_stop_failed: "인스턴스 종료 요청에 실패했습니다.",
 };
 
 function connectionHref(protocol: ChallengeConnectionProtocol | null, host: string | null, port: number | null) {
@@ -78,6 +83,8 @@ export async function InternalChallenges({
           protocol: true,
           host: true,
           port: true,
+          instanceLifetimeMinutes: true,
+          instances: { where: { userId }, orderBy: { startedAt: "desc" }, take: 1, select: { id: true, status: true, connectionHost: true, connectionPort: true, connectionProtocol: true, expiresAt: true } },
           hints: { orderBy: { position: "asc" }, select: { id: true, content: true } },
           resources: { orderBy: { createdAt: "asc" }, select: { id: true, originalFilename: true, sizeBytes: true } },
         },
@@ -110,12 +117,15 @@ export async function InternalChallenges({
           const submission = item.challengeSubmissions[0];
           const access = getChallengeAttemptAccess({ canSubmit, opensAt, deadline, allowLate, completedAt: submission?.completedAt, attemptsCount: submission?.attemptsCount ?? 0, maxAttempts: grading.maxAttempts });
           const href = connectionHref(challenge.protocol, challenge.host, challenge.port);
+          const instance = challenge.instances[0] && challenge.instances[0].expiresAt > new Date() ? challenge.instances[0] : null;
+          const instanceHref = instance ? connectionHref(instance.connectionProtocol, instance.connectionHost, instance.connectionPort) : null;
           const error = feedback.itemId === item.id && feedback.error ? ERROR_MESSAGES[feedback.error] : null;
           return (
             <Card key={item.id}>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold text-slate-500">문제 {index + 1} · {INTERNAL_CHALLENGE_MODE_LABELS[challenge.mode]} · {CHALLENGE_CATEGORY_LABELS[challenge.category]}</p><h3 className="mt-1 text-xl font-bold">{challenge.title}</h3><p className="mt-1 text-xs text-slate-500">난이도 {challenge.difficulty}</p></div><strong className="text-indigo-600">{challenge.points}점</strong></div>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{challenge.description}</p>
               {challenge.host && challenge.protocol && challenge.port && <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800"><p className="flex items-center gap-2 font-semibold"><Server size={17} /> {CHALLENGE_CONNECTION_PROTOCOL_LABELS[challenge.protocol]} 접속</p>{href ? <a className="mt-1 block break-all text-indigo-600 hover:underline" href={href} rel="noopener noreferrer" target="_blank">{challenge.host}:{challenge.port}</a> : <code className="mt-1 block break-all">{challenge.host}:{challenge.port}</code>}</div>}
+              {challenge.mode === InternalChallengeMode.PERSONAL_INSTANCE && <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800"><p className="flex items-center gap-2 font-semibold"><Server size={17} /> 개인 격리 인스턴스 · 최대 {challenge.instanceLifetimeMinutes}분</p>{instance?.status === "RUNNING" && instance.connectionHost && instance.connectionPort ? <><p className="mt-2 text-xs text-slate-500">만료 {instance.expiresAt.toLocaleString("ko-KR")}</p>{instanceHref ? <a className="mt-1 block text-indigo-600" href={instanceHref} rel="noopener noreferrer" target="_blank">{instance.connectionHost}:{instance.connectionPort}</a> : <code className="mt-1 block">{instance.connectionHost}:{instance.connectionPort}</code>}<form action={stopChallengeInstance} className="mt-3"><input name="organizationId" type="hidden" value={organizationId} /><input name="assignmentId" type="hidden" value={assignmentId} /><input name="itemId" type="hidden" value={item.id} /><input name="instanceId" type="hidden" value={instance.id} /><Button type="submit">인스턴스 종료</Button></form></> : instance?.status === "STARTING" ? <p className="mt-2 text-slate-500">인스턴스를 준비하고 있습니다.</p> : <form action={startChallengeInstance} className="mt-3"><input name="organizationId" type="hidden" value={organizationId} /><input name="assignmentId" type="hidden" value={assignmentId} /><input name="itemId" type="hidden" value={item.id} /><Button type="submit">개인 인스턴스 시작</Button></form>}</div>}
               {challenge.resources.map((resource) => <a className="mt-3 flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:underline" href={`/api/challenge-resources/${resource.id}`} key={resource.id}><Download size={16} /> {resource.originalFilename} ({Math.ceil(Number(resource.sizeBytes) / 1024)}KB)</a>)}
               {challenge.hints.length > 0 && <details className="mt-4 rounded-xl border border-amber-200 p-3"><summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><Lightbulb size={16} /> 힌트 {challenge.hints.length}개</summary><ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">{challenge.hints.map((hint) => <li key={hint.id}>{hint.content}</li>)}</ol></details>}
               {submission && <p className="mt-4 text-sm text-slate-500">시도 {submission.attemptsCount}회 · {submission.completedAt ? `완료 ${submission.score}점` : "진행 중"}</p>}

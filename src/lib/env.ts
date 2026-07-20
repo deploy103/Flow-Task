@@ -23,6 +23,32 @@ const cleanupEnvironmentSchema = z.object({
   SUBMISSION_CLEANUP_SECRET: z.string().min(32),
 });
 
+const integrationEnvironmentSchema = z.object({
+  INTEGRATION_ENCRYPTION_KEY: z.string().min(32),
+  EXTERNAL_SERVICE_ALLOWED_HOSTS: z.string().default(""),
+});
+
+const notificationDeliveryEnvironmentSchema = integrationEnvironmentSchema.extend({
+  NOTIFICATION_DELIVERY_SECRET: z.string().min(32),
+  WEB_PUSH_VAPID_PUBLIC_KEY: z.string().min(40),
+  WEB_PUSH_VAPID_PRIVATE_KEY: z.string().min(20),
+  WEB_PUSH_SUBJECT: z.string().regex(/^mailto:.+@.+$/),
+});
+
+const instanceProviderEnvironmentSchema = z.object({
+  INSTANCE_PROVIDER_URL: z.url(),
+  INSTANCE_PROVIDER_TOKEN: z.string().min(32),
+  EXTERNAL_SERVICE_ALLOWED_HOSTS: z.string().default(""),
+});
+
+function withAllowedHosts<T extends { EXTERNAL_SERVICE_ALLOWED_HOSTS: string }>(value: T) {
+  return { ...value, allowedHosts: value.EXTERNAL_SERVICE_ALLOWED_HOSTS.split(",").map((host) => host.trim().toLowerCase()).filter(Boolean) };
+}
+
+export function getIntegrationEnvironment() { return withAllowedHosts(integrationEnvironmentSchema.parse(process.env)); }
+export function getNotificationDeliveryEnvironment() { return withAllowedHosts(notificationDeliveryEnvironmentSchema.parse(process.env)); }
+export function getInstanceProviderEnvironment() { return withAllowedHosts(instanceProviderEnvironmentSchema.parse(process.env)); }
+
 export function getServerEnvironment() {
   return serverEnvironmentSchema.parse(process.env);
 }
