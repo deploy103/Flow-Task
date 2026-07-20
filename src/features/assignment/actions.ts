@@ -68,16 +68,18 @@ export async function createAssignment(formData: FormData) {
             parsed.data.audience === AssignmentAudience.SELECTED_MEMBERS
               ? { createMany: { data: targetUserIds.map((userId) => ({ userId })) } }
               : undefined,
-          fields: {
-            createMany: {
-              data: parsedFieldTypes.data.map((type, position) => ({
-                type,
-                label: ASSIGNMENT_FIELD_LABELS[type],
-                required: true,
-                position,
-              })),
-            },
-          },
+          fields: parsedFieldTypes.data.length
+            ? {
+                createMany: {
+                  data: parsedFieldTypes.data.map((type, position) => ({
+                    type,
+                    label: ASSIGNMENT_FIELD_LABELS[type],
+                    required: true,
+                    position,
+                  })),
+                },
+              }
+            : undefined,
         },
       });
       await transaction.auditLog.create({
