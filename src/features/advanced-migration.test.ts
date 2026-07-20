@@ -18,4 +18,10 @@ describe("advanced features migration", () => {
     expect(migration).not.toContain("docker.sock");
     expect(migration).not.toContain("privileged");
   });
+  it("does not use the newly added instance enum value before commit", () => {
+    expect(migration).toContain('"mode"::TEXT = \'PERSONAL_INSTANCE\'');
+    expect(migration).toContain('"mode"::TEXT <> \'PERSONAL_INSTANCE\'');
+    expect(migration).not.toContain('"mode" = \'PERSONAL_INSTANCE\'');
+    expect(migration).not.toContain('"mode" <> \'PERSONAL_INSTANCE\'');
+  });
 });
