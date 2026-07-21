@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSystemAdministrator } from "@/features/admin/access";
 import { ensureUserProfile } from "./profile-recovery";
 
 export async function requireAuthenticatedUser() {
@@ -16,4 +17,10 @@ export async function requireAuthenticatedUser() {
     await supabase.auth.signOut();
     redirect("/login?error=profile_recovery_failed");
   }
+}
+
+export async function requireSystemAdministrator() {
+  const user = await requireAuthenticatedUser();
+  if (!isSystemAdministrator(user)) notFound();
+  return user;
 }
