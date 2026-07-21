@@ -47,7 +47,7 @@ try {
       },
     });
   });
-  process.stdout.write(`System administrator ready: ${email}\n`);
+  process.stdout.write("System administrator is ready.\n");
 } finally {
   await prisma.$disconnect();
 }
