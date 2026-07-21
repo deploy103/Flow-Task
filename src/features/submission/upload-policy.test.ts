@@ -12,20 +12,20 @@ import {
 } from "./upload-policy";
 
 describe("submission upload request body", () => {
-  it("requires a small JSON body with a declared length", () => {
+  it("requires bounded multipart file uploads with a declared length", () => {
     expect(
       hasBoundedSubmissionUploadRequestBody({
-        contentType: "application/json; charset=utf-8",
+        contentType: "multipart/form-data; boundary=test",
         contentLength: "512",
       }),
     ).toBe(true);
     expect(
-      hasBoundedSubmissionUploadRequestBody({ contentType: "application/json", contentLength: null }),
+      hasBoundedSubmissionUploadRequestBody({ contentType: "multipart/form-data", contentLength: null }),
     ).toBe(false);
     expect(
       hasBoundedSubmissionUploadRequestBody({
         contentType: "application/json",
-        contentLength: String(5 * 1024),
+        contentLength: "512",
       }),
     ).toBe(false);
   });

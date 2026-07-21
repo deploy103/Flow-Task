@@ -16,11 +16,21 @@ jobs:
       CLEANUP_URL: ${{ secrets.SUBMISSION_CLEANUP_URL }}
       CLEANUP_SECRET: ${{ secrets.SUBMISSION_CLEANUP_SECRET }}
     steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v7
-      - name: Require cleanup configuration
+      - name: Check cleanup configuration
+        id: configuration
         run: |
-          test -n "$CLEANUP_URL"
-          test -n "$CLEANUP_SECRET"
+          if [ -n "$CLEANUP_URL" ] && [ -n "$CLEANUP_SECRET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLEANUP_URL" ] && [ -z "$CLEANUP_SECRET" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Submission upload cleanup is disabled because its secrets are not configured."
+          else
+            echo "::error::SUBMISSION_CLEANUP_URL and SUBMISSION_CLEANUP_SECRET must be configured together."
+            exit 1
+          fi
+      - name: Checkout cleanup script
+        if: steps.configuration.outputs.enabled == 'true'
+        uses: actions/checkout@v7
       - name: Remove expired submission uploads
+        if: steps.configuration.outputs.enabled == 'true'
         run: sh deploy/scripts/run-submission-cleanup.sh

@@ -9,8 +9,8 @@ ALTER TABLE "submission_uploads"
   ADD COLUMN "cleanup_error" VARCHAR(80);
 
 ALTER TABLE "submission_uploads" ADD CONSTRAINT "submission_uploads_cleanup_state" CHECK (
-  ("status" = 'CLEANED' AND "cleaned_at" IS NOT NULL AND "consumed_at" IS NULL) OR
-  ("status" <> 'CLEANED' AND "cleaned_at" IS NULL)
+  ("status"::TEXT = 'CLEANED' AND "cleaned_at" IS NOT NULL AND "consumed_at" IS NULL) OR
+  ("status"::TEXT <> 'CLEANED' AND "cleaned_at" IS NULL)
 );
 
 ALTER TABLE "submission_uploads" ADD CONSTRAINT "submission_uploads_cleanup_after_token" CHECK (

@@ -7,13 +7,12 @@ import {
 } from "@/constants/assignment";
 import { getApiUser } from "@/features/auth/api";
 import { canSubmitAssignment } from "@/features/submission/access";
-import { validateSubmissionFileMetadata } from "@/features/submission/policy";
+import { hasValidSubmissionFileSignature, validateSubmissionFileMetadata } from "@/features/submission/policy";
 import {
   cancelSubmissionUploadsSchema,
-  createSubmissionUploadSchema,
 } from "@/features/submission/schemas";
 import { resolveSubmissionStatus } from "@/features/submission/state";
-import { createSignedSubmissionUpload, createSubmissionStoragePath, removeSubmissionFile } from "@/features/submission/storage";
+import { createSubmissionStoragePath, removeSubmissionFile, uploadSubmissionFile } from "@/features/submission/storage";
 import { getSubmissionUploadLifecycle } from "@/features/submission/upload-lifecycle";
 import {
   evaluateSubmissionUploadGrant,
@@ -76,30 +75,35 @@ export async function POST(
   const context = await getUploadContext(organizationId, assignmentId);
   if ("error" in context) return context.error;
 
-  let body: unknown;
+  let body: FormData;
   try {
-    body = await request.json();
+    body = await request.formData();
   } catch {
     return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
   }
-  const parsed = createSubmissionUploadSchema.safeParse(body);
-  if (!parsed.success) return jsonError("INVALID_FILE", "파일 정보가 올바르지 않습니다.", 400);
+  const fieldId = body.get("fieldId");
+  const file = body.get("file");
+  if (typeof fieldId !== "string" || !(file instanceof File)) {
+    return jsonError("INVALID_FILE", "파일 정보가 올바르지 않습니다.", 400);
+  }
   const field = context.assignment.fields.find(
-    (candidate) => candidate.id === parsed.data.fieldId && candidate.type === AssignmentFieldType.FILE,
+    (candidate) => candidate.id === fieldId && candidate.type === AssignmentFieldType.FILE,
   );
   if (!field) return jsonError("INVALID_FIELD", "제출 파일 항목을 찾을 수 없습니다.", 400);
   const metadata = validateSubmissionFileMetadata({
-    name: parsed.data.filename,
-    size: parsed.data.sizeBytes,
-    type: parsed.data.mimeType,
+    name: file.name,
+    size: file.size,
+    type: file.type,
   });
-  if (!metadata) return jsonError("INVALID_FILE", "허용되지 않는 파일입니다.", 400);
+  if (!metadata || !(await hasValidSubmissionFileSignature(file, metadata.extension))) {
+    return jsonError("INVALID_FILE", "허용되지 않는 파일입니다.", 400);
+  }
 
   const now = new Date();
   const windowStartedAt = new Date(
     now.getTime() - SUBMISSION_UPLOAD_RATE_WINDOW_MINUTES * MILLISECONDS_PER_MINUTE,
   );
-  const { cleanupAfter, expiresAt, signedTokenExpiresAt } = getSubmissionUploadLifecycle(now);
+  const { cleanupAfter, expiresAt, uploadDeadline } = getSubmissionUploadLifecycle(now);
   const storagePath = createSubmissionStoragePath({
     organizationId,
     assignmentId,
@@ -192,7 +196,7 @@ export async function POST(
             sizeBytes: BigInt(metadata.sizeBytes),
             reservedBytes: BigInt(SUBMISSION_UPLOAD_RESERVED_BYTES),
             expiresAt,
-            signedTokenExpiresAt,
+            uploadDeadline,
             cleanupAfter,
           },
         });
@@ -213,18 +217,19 @@ export async function POST(
   }
 
   try {
-    const signed = await createSignedSubmissionUpload(storagePath);
+    await uploadSubmissionFile(storagePath, file);
     return NextResponse.json({
       success: true,
-      data: { uploadId: grantResult.grantId, ...signed },
+      data: { uploadId: grantResult.grantId },
     });
   } catch {
     await Promise.allSettled([
+      removeSubmissionFile(storagePath),
       prisma.submissionUpload.updateMany({
         where: { id: grantResult.grantId, status: SubmissionUploadStatus.PENDING },
         data: {
           status: SubmissionUploadStatus.FAILED,
-          signedTokenExpiresAt: now,
+          uploadDeadline: now,
           cleanupAfter: now,
         },
       }),
