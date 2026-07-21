@@ -33,14 +33,21 @@ export async function signUp(formData: FormData) {
 
   const supabase = await createSupabaseServerClient();
   const { NEXT_PUBLIC_APP_URL } = getServerEnvironment();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: { name: parsed.data.name, student_number: parsed.data.studentNumber },
-      emailRedirectTo: `${NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
-  });
+  let signUpResult;
+  try {
+    signUpResult = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      options: {
+        data: { name: parsed.data.name, student_number: parsed.data.studentNumber },
+        emailRedirectTo: `${NEXT_PUBLIC_APP_URL}/auth/callback`,
+      },
+    });
+  } catch {
+    redirect("/signup?error=auth_unavailable");
+  }
+
+  const { data, error } = signUpResult;
 
   if (error || !data.user || data.user.identities?.length === 0) {
     redirect("/signup?error=signup_failed");
