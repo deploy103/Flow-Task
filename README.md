@@ -77,6 +77,7 @@ npm run build
 
 - 비밀번호는 랜덤 salt가 포함된 scrypt 해시로만 저장하고 세션 토큰도 SHA-256 해시만 DB에 저장합니다.
 - 인증 쿠키는 `HttpOnly`, `SameSite=Lax`, 운영 환경의 `Secure` 속성을 사용합니다.
+- 인증 rate limit은 DB의 원자적 카운터를 사용합니다. Compose의 앱 포트는 loopback에만 바인딩되며, 기본값에서는 클라이언트 전달 IP 헤더를 신뢰하지 않습니다. 신뢰 프록시가 `X-Real-IP`을 항상 덮어쓰는 환경에서만 `AUTH_TRUST_PROXY=true`를 설정합니다.
 - 애플리케이션 테이블에는 RLS를 활성화하고 Data API 정책을 만들지 않아 브라우저 직접 접근을 차단합니다.
 - 초대 코드 원문은 발급 시 한 번만 표시하며 DB에는 pepper가 포함된 SHA-256 해시만 저장합니다.
 - 조직 변경 작업은 세션의 사용자, 조직 소속, 조직 내 역할을 서버에서 다시 확인합니다.
@@ -85,6 +86,8 @@ npm run build
 - 비밀값, 운영 설정, 사용자 데이터는 저장소에 포함하지 않습니다.
 
 Docker Compose 예시는 [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml)에 있습니다. DB 포트는 호스트에 공개하지 않습니다.
+
+Compose의 마이그레이션 서비스는 자체 인증 전환 전에 기존 사용자 중 로컬 credential이 없는 사용자가 0명인지 강제로 검사합니다. 누락 사용자가 있으면 배포를 중단하므로 먼저 별도의 비밀번호 설정·재설정 절차를 마련해야 합니다. preflight 로그에는 사용자 식별자를 출력하지 않습니다.
 
 최초 시스템 관리자는 마이그레이션 완료 후 운영 서버의 `deploy` 디렉터리에서 다음처럼 생성합니다. 비밀번호는 셸 기록이나 파일에 남기지 말고 일시적인 환경변수로만 전달합니다.
 
