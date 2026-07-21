@@ -5,45 +5,83 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 const policies = {
-  LOGIN: { attempts: 10, windowMilliseconds: 15 * 60 * 1_000 },
-  SIGNUP: { attempts: 5, windowMilliseconds: 60 * 60 * 1_000 },
+  LOGIN: {
+    windowMilliseconds: 15 * 60 * 1_000,
+    accountAttempts: 10,
+    ipAttempts: 20,
+    globalAttempts: 200,
+  },
+  SIGNUP: {
+    windowMilliseconds: 60 * 60 * 1_000,
+    accountAttempts: 5,
+    ipAttempts: 10,
+    globalAttempts: 100,
+  },
 } as const;
 const RATE_LIMIT_RETENTION_MILLISECONDS = 2 * 60 * 60 * 1_000;
+const UNTRUSTED_DIRECT_SOURCE_KEY = "source:untrusted-direct";
+const GLOBAL_SOURCE_KEY = "global:all-clients";
 
 export type AuthRateLimitAction = keyof typeof policies;
 
-export function resolveAuthRateLimitClientKey(
+type AuthRateLimitCounter = {
+  action: string;
+  clientKey: string;
+  attempts: number;
+  windowMilliseconds: number;
+};
+
+export function resolveAuthRateLimitSourceKey(
   requestHeaders: { get(name: string): string | null },
-  identity: string,
   trustProxy = process.env.AUTH_TRUST_PROXY === "true",
 ) {
   if (trustProxy) {
     const proxyAddress = requestHeaders.get("x-real-ip")?.trim();
-    if (proxyAddress && isIP(proxyAddress)) return `ip:${proxyAddress}`;
+    if (proxyAddress && isIP(proxyAddress)) return `source:${proxyAddress}`;
   }
-  return `identity:${identity.trim().toLowerCase()}`;
+  return UNTRUSTED_DIRECT_SOURCE_KEY;
 }
 
-function hashClientKey(clientKey: string) {
+export function getAuthRateLimitKeyHash(clientKey: string) {
   return createHash("sha256").update(clientKey, "utf8").digest("hex");
 }
 
-export async function consumeAuthAttemptForKey(
+export function getAuthRateLimitCounters(
   action: AuthRateLimitAction,
-  clientKey: string,
-  now = new Date(),
+  identity: string,
+  sourceKey: string,
 ) {
   const policy = policies[action];
-  const keyHash = hashClientKey(clientKey);
-  const windowBoundary = new Date(now.getTime() - policy.windowMilliseconds);
-  const cleanupBoundary = new Date(now.getTime() - RATE_LIMIT_RETENTION_MILLISECONDS);
+  return {
+    ip: {
+      action: `${action}_IP`,
+      clientKey: sourceKey,
+      attempts: policy.ipAttempts,
+      windowMilliseconds: policy.windowMilliseconds,
+    },
+    global: {
+      action: `${action}_GLOBAL`,
+      clientKey: GLOBAL_SOURCE_KEY,
+      attempts: policy.globalAttempts,
+      windowMilliseconds: policy.windowMilliseconds,
+    },
+    account: {
+      action: `${action}_ACCOUNT`,
+      clientKey: `account:${identity.trim().toLowerCase()}`,
+      attempts: policy.accountAttempts,
+      windowMilliseconds: policy.windowMilliseconds,
+    },
+  } satisfies Record<string, AuthRateLimitCounter>;
+}
 
-  await prisma.authRateLimit.deleteMany({ where: { updatedAt: { lte: cleanupBoundary } } });
+async function consumeAuthRateLimitCounter(counter: AuthRateLimitCounter, now: Date) {
+  const keyHash = getAuthRateLimitKeyHash(counter.clientKey);
+  const windowBoundary = new Date(now.getTime() - counter.windowMilliseconds);
   const consumed = await prisma.$queryRaw<Array<{ allowed: boolean }>>(Prisma.sql`
     INSERT INTO "auth_rate_limits" (
       "key_hash", "action", "attempts", "window_started_at", "updated_at"
     ) VALUES (
-      ${keyHash}, ${action}, 1, ${now}, ${now}
+      ${keyHash}, ${counter.action}, 1, ${now}, ${now}
     )
     ON CONFLICT ("key_hash", "action") DO UPDATE SET
       "attempts" = CASE
@@ -57,16 +95,32 @@ export async function consumeAuthAttemptForKey(
       "updated_at" = ${now}
     WHERE
       "auth_rate_limits"."window_started_at" <= ${windowBoundary}
-      OR "auth_rate_limits"."attempts" < ${policy.attempts}
+      OR "auth_rate_limits"."attempts" < ${counter.attempts}
     RETURNING TRUE AS "allowed"
   `);
   return consumed.length === 1;
 }
 
+export async function consumeAuthAttemptsForContext(
+  action: AuthRateLimitAction,
+  identity: string,
+  sourceKey: string,
+  now = new Date(),
+) {
+  const cleanupBoundary = new Date(now.getTime() - RATE_LIMIT_RETENTION_MILLISECONDS);
+  await prisma.authRateLimit.deleteMany({ where: { updatedAt: { lte: cleanupBoundary } } });
+
+  const counters = getAuthRateLimitCounters(action, identity, sourceKey);
+  if (!(await consumeAuthRateLimitCounter(counters.global, now))) return false;
+  if (!(await consumeAuthRateLimitCounter(counters.ip, now))) return false;
+  return consumeAuthRateLimitCounter(counters.account, now);
+}
+
 export async function consumeAuthAttempt(action: AuthRateLimitAction, identity: string) {
   const requestHeaders = await headers();
-  return consumeAuthAttemptForKey(
+  return consumeAuthAttemptsForContext(
     action,
-    resolveAuthRateLimitClientKey(requestHeaders, identity),
+    identity,
+    resolveAuthRateLimitSourceKey(requestHeaders),
   );
 }
