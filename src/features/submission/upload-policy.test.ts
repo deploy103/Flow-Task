@@ -8,6 +8,7 @@ import {
 } from "@/constants/assignment";
 import {
   evaluateSubmissionUploadGrant,
+  hasBoundedSubmissionUploadCancellationBody,
   hasBoundedSubmissionUploadRequestBody,
 } from "./upload-policy";
 
@@ -26,6 +27,27 @@ describe("submission upload request body", () => {
       hasBoundedSubmissionUploadRequestBody({
         contentType: "application/json",
         contentLength: "512",
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts only small declared JSON cancellation bodies", () => {
+    expect(
+      hasBoundedSubmissionUploadCancellationBody({
+        contentType: "application/json; charset=utf-8",
+        contentLength: "128",
+      }),
+    ).toBe(true);
+    expect(
+      hasBoundedSubmissionUploadCancellationBody({
+        contentType: "multipart/form-data",
+        contentLength: "128",
+      }),
+    ).toBe(false);
+    expect(
+      hasBoundedSubmissionUploadCancellationBody({
+        contentType: "application/json",
+        contentLength: "4097",
       }),
     ).toBe(false);
   });
