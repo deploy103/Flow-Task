@@ -12,14 +12,10 @@ import {
   hasValidSubmissionFileSignature,
   validateSubmissionFile,
 } from "@/features/submission/policy";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSubmissionUpload } from "./submission-upload-context";
 
-type UploadGrant = {
+type UploadedFile = {
   uploadId: string;
-  bucket: string;
-  path: string;
-  token: string;
 };
 
 export function SubmissionFileInput({
@@ -105,36 +101,21 @@ export function SubmissionFileInput({
         if (!metadata || !(await hasValidSubmissionFileSignature(file, metadata.extension))) {
           throw new Error("INVALID_FILE");
         }
-        const grantResponse = await fetch(endpoint, {
+        const body = new FormData();
+        body.set("fieldId", fieldId);
+        body.set("file", file);
+        const uploadResponse = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fieldId,
-            filename: metadata.originalFilename,
-            mimeType: metadata.mimeType,
-            sizeBytes: metadata.sizeBytes,
-          }),
+          body,
         });
-        const grantBody = (await grantResponse.json()) as {
+        const uploadBody = (await uploadResponse.json()) as {
           success: boolean;
-          data?: UploadGrant;
+          data?: UploadedFile;
         };
-        if (!grantResponse.ok || !grantBody.success || !grantBody.data) {
-          throw new Error("UPLOAD_GRANT_FAILED");
-        }
-        const grant = grantBody.data;
-        const supabase = createSupabaseBrowserClient();
-        const { error: uploadError } = await supabase.storage
-          .from(grant.bucket)
-          .uploadToSignedUrl(grant.path, grant.token, file, {
-            contentType: metadata.mimeType,
-            upsert: false,
-          });
-        if (uploadError) {
-          await cancelUploads([grant.uploadId]);
+        if (!uploadResponse.ok || !uploadBody.success || !uploadBody.data) {
           throw new Error("UPLOAD_FAILED");
         }
-        completed.push({ id: grant.uploadId, name: metadata.originalFilename });
+        completed.push({ id: uploadBody.data.uploadId, name: metadata.originalFilename });
         setTrackedUploads([...completed]);
       }
     } catch {
