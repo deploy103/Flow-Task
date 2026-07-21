@@ -2,27 +2,33 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { getServerEnvironment } from "@/lib/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loginSchema, profileSchema, signUpSchema } from "./schemas";
 import { requireAuthenticatedUser } from "./guards";
-import { ensureUserProfile } from "./profile-recovery";
+import { hashPassword, verifyPassword } from "./password";
+import { createUserSession, revokeCurrentSession } from "./session";
+import { consumeAuthAttempt } from "./rate-limit";
 
 export async function login(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/login?error=invalid_input");
+  if (!(await consumeAuthAttempt("LOGIN"))) redirect("/login?error=rate_limited");
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error || !data.user) redirect("/login?error=invalid_credentials");
-
-  try {
-    await ensureUserProfile(data.user);
-  } catch {
-    await supabase.auth.signOut();
-    redirect("/login?error=profile_recovery_failed");
+  const email = parsed.data.email.toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { credential: true },
+  });
+  if (!user?.credential) {
+    await hashPassword(parsed.data.password);
+    redirect("/login?error=invalid_credentials");
   }
+  if (!(await verifyPassword(parsed.data.password, user.credential.passwordHash))) {
+    redirect("/login?error=invalid_credentials");
+  }
+  await createUserSession(user.id);
 
   redirect("/dashboard");
 }
@@ -30,39 +36,36 @@ export async function login(formData: FormData) {
 export async function signUp(formData: FormData) {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/signup?error=invalid_input");
+  if (!(await consumeAuthAttempt("SIGNUP"))) redirect("/signup?error=rate_limited");
 
-  const supabase = await createSupabaseServerClient();
-  const { NEXT_PUBLIC_APP_URL } = getServerEnvironment();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: { name: parsed.data.name, student_number: parsed.data.studentNumber },
-      emailRedirectTo: `${NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
-  });
-
-  if (error || !data.user || data.user.identities?.length === 0) {
-    redirect("/signup?error=signup_failed");
-  }
-
+  const id = randomUUID();
+  const email = parsed.data.email.toLowerCase();
+  const passwordHash = await hashPassword(parsed.data.password);
   try {
-    await ensureUserProfile(data.user, {
-      preferredSeed: {
+    await prisma.user.create({
+      data: {
+        id,
+        email,
         name: parsed.data.name,
         studentNumber: parsed.data.studentNumber,
+        credential: { create: { passwordHash } },
+        auditLogs: {
+          create: { action: "USER_REGISTERED", targetType: "USER", targetId: id },
+        },
       },
     });
-  } catch {
-    redirect("/signup?error=profile_creation_failed");
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      redirect("/signup?error=email_in_use");
+    }
+    redirect("/signup?error=signup_failed");
   }
-
-  redirect(data.session ? "/dashboard" : "/login?message=check_email");
+  await createUserSession(id);
+  redirect("/dashboard");
 }
 
 export async function logout() {
-  const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await revokeCurrentSession();
   redirect("/login");
 }
 

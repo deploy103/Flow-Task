@@ -16,10 +16,21 @@ jobs:
       DELIVERY_URL: ${{ secrets.NOTIFICATION_DELIVERY_URL }}
       DELIVERY_SECRET: ${{ secrets.NOTIFICATION_DELIVERY_SECRET }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Require delivery configuration
+      - name: Check delivery configuration
+        id: configuration
         run: |
-          test -n "$DELIVERY_URL"
-          test -n "$DELIVERY_SECRET"
+          if [ -n "$DELIVERY_URL" ] && [ -n "$DELIVERY_SECRET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$DELIVERY_URL" ] && [ -z "$DELIVERY_SECRET" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Notification delivery is disabled because its secrets are not configured."
+          else
+            echo "::error::NOTIFICATION_DELIVERY_URL and NOTIFICATION_DELIVERY_SECRET must be configured together."
+            exit 1
+          fi
+      - name: Checkout delivery script
+        if: steps.configuration.outputs.enabled == 'true'
+        uses: actions/checkout@v7
       - name: Deliver queued notifications
+        if: steps.configuration.outputs.enabled == 'true'
         run: sh deploy/scripts/run-notification-delivery.sh

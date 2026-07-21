@@ -4,15 +4,10 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      SUBMISSION_STORAGE_BUCKET: ${SUBMISSION_STORAGE_BUCKET}
+      LOCAL_STORAGE_ROOT: /app/data/uploads
       SUBMISSION_CLEANUP_SECRET: ${SUBMISSION_CLEANUP_SECRET}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       INVITATION_CODE_PEPPER: ${INVITATION_CODE_PEPPER}
@@ -27,6 +22,8 @@ services:
       INSTANCE_PROVIDER_TOKEN: ${INSTANCE_PROVIDER_TOKEN}
     ports:
       - "${APP_PORT:-3000}:3000"
+    volumes:
+      - local_storage:/app/data/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -45,8 +42,6 @@ services:
       dockerfile: deploy/Dockerfile
       target: builder
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
     command: ["npx", "prisma", "migrate", "deploy"]
     environment:
@@ -79,6 +74,7 @@ services:
 
 volumes:
   postgres_data:
+  local_storage:
 
 networks:
   app_network:

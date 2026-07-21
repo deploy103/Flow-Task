@@ -27,7 +27,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
           })
         ).map(({ organization }) => organization);
   return (
-    <AppShell userName={user.name} organizations={organizations} unreadNotifications={unreadNotifications}>
+    <AppShell
+      userName={user.name}
+      organizations={organizations}
+      unreadNotifications={unreadNotifications}
+      isSystemAdmin={user.systemRole === SystemRole.SYSTEM_ADMIN}
+    >
       {children}
     </AppShell>
   );
