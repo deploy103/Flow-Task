@@ -2,6 +2,7 @@ import {
   MAX_PENDING_SUBMISSION_UPLOAD_BYTES_PER_USER,
   MAX_PENDING_SUBMISSION_UPLOAD_BYTES_PER_ORGANIZATION,
   MAX_SUBMISSION_UPLOAD_REQUEST_BODY_BYTES,
+  MAX_SUBMISSION_FILE_SIZE_BYTES,
   MAX_SUBMISSION_UPLOAD_BYTES_PER_WINDOW,
   MAX_SUBMISSION_UPLOAD_BYTES_PER_ORGANIZATION_WINDOW,
   MAX_SUBMISSION_UPLOAD_GRANTS_PER_WINDOW,
@@ -13,10 +14,10 @@ export function hasBoundedSubmissionUploadRequestBody(input: {
 }) {
   const contentLength = Number(input.contentLength);
   return (
-    input.contentType?.startsWith("application/json") === true &&
+    input.contentType?.startsWith("multipart/form-data") === true &&
     Number.isInteger(contentLength) &&
     contentLength > 0 &&
-    contentLength <= MAX_SUBMISSION_UPLOAD_REQUEST_BODY_BYTES
+    contentLength <= MAX_SUBMISSION_FILE_SIZE_BYTES + MAX_SUBMISSION_UPLOAD_REQUEST_BODY_BYTES
   );
 }
 

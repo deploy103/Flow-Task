@@ -8,14 +8,14 @@ import {
 const createdAt = new Date("2026-07-16T00:00:00Z");
 
 describe("submission upload lifecycle", () => {
-  it("keeps cleanup after both the app grant and signed token expiration", () => {
+  it("keeps a cleanup grace period after the local upload deadline", () => {
     const lifecycle = getSubmissionUploadLifecycle(createdAt);
     expect(lifecycle.expiresAt).toEqual(new Date("2026-07-16T00:15:00Z"));
-    expect(lifecycle.signedTokenExpiresAt).toEqual(new Date("2026-07-16T02:00:00Z"));
-    expect(lifecycle.cleanupAfter).toEqual(new Date("2026-07-16T02:10:00Z"));
+    expect(lifecycle.uploadDeadline).toEqual(new Date("2026-07-16T00:15:00Z"));
+    expect(lifecycle.cleanupAfter).toEqual(new Date("2026-07-16T00:25:00Z"));
   });
 
-  it("does not clean a page-abandoned upload while its signed token may still be valid", () => {
+  it("does not clean a page-abandoned upload during its local cleanup grace period", () => {
     const lifecycle = getSubmissionUploadLifecycle(createdAt);
     expect(
       isSubmissionUploadCleanupEligible(

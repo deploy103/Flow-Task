@@ -15,10 +15,7 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: postgresql://localhost:5432/flow_task
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder
-      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-placeholder-value-32-characters
-      SUBMISSION_STORAGE_BUCKET: assignment-submissions
+      LOCAL_STORAGE_ROOT: /tmp/flow-task-ci-uploads
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       INVITATION_CODE_PEPPER: ci-only-placeholder-value-32-characters
     steps:

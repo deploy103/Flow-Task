@@ -44,10 +44,6 @@ function formatBytes(value: bigint | null | undefined) {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
-function configured(value: string | undefined) {
-  return Boolean(value && !/placeholder|your-project|example\.com/i.test(value));
-}
-
 async function measureDatabaseLatency() {
   const startedAt = performance.now();
   await prisma.$queryRaw`SELECT 1`;
@@ -111,8 +107,7 @@ export default async function SystemAdminDashboard() {
     }),
   ]);
 
-  const supabaseConfigured = configured(process.env.NEXT_PUBLIC_SUPABASE_URL) && configured(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  const storageConfigured = supabaseConfigured && configured(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const localStorageConfigured = Boolean(process.env.LOCAL_STORAGE_ROOT?.startsWith("/"));
   const adminCount = await prisma.user.count({ where: { systemRole: SystemRole.SYSTEM_ADMIN } });
   const recentErrors = [
     ...recentDeliveryFailures.map((item) => ({
@@ -146,7 +141,7 @@ export default async function SystemAdminDashboard() {
           <h1 className="mt-1 text-3xl font-black">시스템 관리자 대시보드</h1>
           <p className="mt-2 text-sm text-slate-500">민감한 비밀값과 사용자 제출 내용은 이 화면에 표시하지 않습니다.</p>
         </div>
-        <StatusPill healthy={supabaseConfigured}>{supabaseConfigured ? "인증 설정 정상" : "인증 설정 필요"}</StatusPill>
+        <StatusPill healthy>자체 인증 정상</StatusPill>
       </div>
 
       <section aria-label="서비스 요약" className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -174,8 +169,8 @@ export default async function SystemAdminDashboard() {
             <div className="flex items-center gap-2"><Database className="text-indigo-600" size={20} /><h3 className="font-bold">의존 서비스</h3></div>
             <div className="mt-5 space-y-4 text-sm">
               <div className="flex items-center justify-between gap-3"><span>PostgreSQL</span><StatusPill healthy>{databaseLatency}ms</StatusPill></div>
-              <div className="flex items-center justify-between gap-3"><span>Supabase Auth</span><StatusPill healthy={supabaseConfigured}>{supabaseConfigured ? "설정됨" : "미설정"}</StatusPill></div>
-              <div className="flex items-center justify-between gap-3"><span>Supabase Storage</span><StatusPill healthy={storageConfigured}>{storageConfigured ? "설정됨" : "미설정"}</StatusPill></div>
+              <div className="flex items-center justify-between gap-3"><span>PostgreSQL Auth</span><StatusPill healthy>정상</StatusPill></div>
+              <div className="flex items-center justify-between gap-3"><span>로컬 비공개 저장소</span><StatusPill healthy={localStorageConfigured}>{localStorageConfigured ? "설정됨" : "미설정"}</StatusPill></div>
               <div className="flex items-center justify-between gap-3"><span>Redis</span><span className="text-xs font-semibold text-slate-500">사용하지 않음 · DB 큐</span></div>
             </div>
           </Card>
