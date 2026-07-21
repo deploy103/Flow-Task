@@ -14,7 +14,7 @@ import { consumeAuthAttempt } from "./rate-limit";
 export async function login(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/login?error=invalid_input");
-  if (!(await consumeAuthAttempt("LOGIN"))) redirect("/login?error=rate_limited");
+  if (!(await consumeAuthAttempt("LOGIN", parsed.data.email))) redirect("/login?error=rate_limited");
 
   const email = parsed.data.email.toLowerCase();
   const user = await prisma.user.findUnique({
@@ -36,7 +36,7 @@ export async function login(formData: FormData) {
 export async function signUp(formData: FormData) {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/signup?error=invalid_input");
-  if (!(await consumeAuthAttempt("SIGNUP"))) redirect("/signup?error=rate_limited");
+  if (!(await consumeAuthAttempt("SIGNUP", parsed.data.email))) redirect("/signup?error=rate_limited");
 
   const id = randomUUID();
   const email = parsed.data.email.toLowerCase();
