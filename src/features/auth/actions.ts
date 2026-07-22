@@ -2,17 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getAuthEmailEnvironment } from "@/lib/env";
-import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, signUpSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 import { requireAuthenticatedUser } from "./guards";
 import { hashPassword, verifyPassword } from "./password";
 import { createUserSession, revokeCurrentSession } from "./session";
 import { consumeAuthAttempt } from "./rate-limit";
 import { buildAuthLink } from "./token";
-import { issueEmailVerificationToken } from "./email-verification";
+import { consumeEmailVerificationToken, issueEmailVerificationToken } from "./email-verification";
 import { issuePasswordResetToken, resetPasswordWithToken } from "./password-reset";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 
@@ -84,17 +85,27 @@ export async function resendVerificationEmail(formData: FormData) {
   const email = parsed.data.email.toLowerCase();
   if (!(await consumeAuthAttempt("VERIFY", email))) redirect("/verify-email?error=rate_limited");
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (user && !user.emailVerifiedAt) {
+  after(async () => {
     try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user || user.emailVerifiedAt) return;
       const token = await issueEmailVerificationToken(user.id);
       const { NEXT_PUBLIC_APP_URL } = getAuthEmailEnvironment();
       await sendVerificationEmail(email, user.name, buildAuthLink(NEXT_PUBLIC_APP_URL, "/auth/verify-email", token));
     } catch {
       // 계정 존재 여부와 메일 공급자 상태를 외부에 노출하지 않는다.
     }
-  }
+  });
   redirect("/verify-email?message=verification_sent");
+}
+
+export async function confirmEmailVerification(formData: FormData) {
+  const parsed = verificationTokenSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/verify-email?error=invalid_or_expired_verification");
+  if (!(await consumeEmailVerificationToken(parsed.data.token))) {
+    redirect("/verify-email?error=invalid_or_expired_verification");
+  }
+  redirect("/login?message=email_verified");
 }
 
 export async function requestPasswordReset(formData: FormData) {
@@ -103,16 +114,17 @@ export async function requestPasswordReset(formData: FormData) {
   const email = parsed.data.email.toLowerCase();
   if (!(await consumeAuthAttempt("RESET", email))) redirect("/forgot-password?error=rate_limited");
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (user?.emailVerifiedAt) {
+  after(async () => {
     try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user?.emailVerifiedAt) return;
       const token = await issuePasswordResetToken(user.id);
       const { NEXT_PUBLIC_APP_URL } = getAuthEmailEnvironment();
       await sendPasswordResetEmail(email, user.name, buildAuthLink(NEXT_PUBLIC_APP_URL, "/reset-password", token));
     } catch {
       // 항상 동일한 응답을 반환해 가입 여부를 추측하지 못하게 한다.
     }
-  }
+  });
   redirect("/forgot-password?message=reset_sent");
 }
 
