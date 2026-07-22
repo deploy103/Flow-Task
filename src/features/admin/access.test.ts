@@ -18,6 +18,8 @@ const baseUser: User = {
   name: "테스트 사용자",
   studentNumber: null,
   birthDate: null,
+  privacyConsentAt: null,
+  privacyConsentVersion: null,
   systemRole: SystemRole.USER,
   createdAt: new Date("2026-07-21T00:00:00Z"),
   updatedAt: new Date("2026-07-21T00:00:00Z"),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseBirthDate } from "./birth-date";
+import { hasMinimumSignupAge, parseBirthDate } from "./birth-date";
 
 const birthDateSchema = z.string().transform((value, context) => {
   const birthDate = parseBirthDate(value);
@@ -9,6 +9,15 @@ const birthDateSchema = z.string().transform((value, context) => {
   }
   return birthDate;
 });
+
+const signupBirthDateSchema = birthDateSchema.refine(hasMinimumSignupAge, {
+  message: "만 14세 이상만 가입할 수 있습니다.",
+});
+
+const optionalBirthDateSchema = z.union([
+  z.literal("").transform(() => undefined),
+  birthDateSchema,
+]).optional();
 
 export const loginSchema = z.object({
   email: z.string().trim().email("올바른 이메일을 입력해 주세요."),
@@ -34,8 +43,9 @@ export const passwordResetSchema = z.object({
 
 export const signUpSchema = loginSchema.extend({
   name: z.string().trim().min(2, "이름은 2자 이상이어야 합니다.").max(50),
-  birthDate: birthDateSchema,
+  birthDate: signupBirthDateSchema,
   passwordConfirmation: z.string().min(8).max(128),
+  privacyConsent: z.literal("on"),
   studentNumber: z
     .string()
     .trim()
@@ -50,7 +60,7 @@ export const signUpSchema = loginSchema.extend({
 
 export const profileSchema = z.object({
   name: z.string().trim().min(2).max(50),
-  birthDate: birthDateSchema,
+  birthDate: optionalBirthDateSchema,
   studentNumber: z
     .string()
     .trim()

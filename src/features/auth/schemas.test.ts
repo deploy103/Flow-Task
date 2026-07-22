@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailRequestSchema, loginSchema, passwordResetSchema, signUpSchema, verificationTokenSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
@@ -17,6 +17,7 @@ describe("auth schemas", () => {
       passwordConfirmation: "safe-password",
       name: "김학생",
       birthDate: "2008-03-01",
+      privacyConsent: "on",
       studentNumber: "",
     });
     expect(result.studentNumber).toBeUndefined();
@@ -29,11 +30,18 @@ describe("auth schemas", () => {
       passwordConfirmation: "safe-password",
       name: "김학생",
       birthDate: "2008-03-01",
+      privacyConsent: "on",
       studentNumber: "",
     };
     expect(signUpSchema.safeParse({ ...valid, birthDate: "2008-02-30" }).success).toBe(false);
     expect(signUpSchema.safeParse({ ...valid, birthDate: "2999-01-01" }).success).toBe(false);
     expect(signUpSchema.safeParse({ ...valid, passwordConfirmation: "other-password" }).success).toBe(false);
+    expect(signUpSchema.safeParse({ ...valid, privacyConsent: undefined }).success).toBe(false);
+    expect(signUpSchema.safeParse({ ...valid, birthDate: "2020-01-01" }).success).toBe(false);
+  });
+
+  it("allows a legacy profile update without collecting a birth date", () => {
+    expect(profileSchema.safeParse({ name: "기존 사용자", studentNumber: "", birthDate: "" }).success).toBe(true);
   });
 
   it("validates password reset confirmation and token shape", () => {
