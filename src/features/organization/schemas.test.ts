@@ -1,6 +1,6 @@
 import { MembershipRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { invitationSchema, joinOrganizationSchema } from "./schemas";
+import { invitationSchema, joinOrganizationSchema, organizationSettingsSchema } from "./schemas";
 
 describe("organization schemas", () => {
   it("rejects issuing administrator invitations", () => {
@@ -26,5 +26,16 @@ describe("organization schemas", () => {
       maxUses: 501,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("validates organization settings and normalizes an empty description", () => {
+    const result = organizationSettingsSchema.parse({
+      organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4",
+      name: "보안 동아리",
+      description: "",
+      removeLogo: "on",
+    });
+    expect(result.description).toBeNull();
+    expect(result.removeLogo).toBe(true);
   });
 });
