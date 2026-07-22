@@ -5,13 +5,15 @@ import { z } from "zod";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { digestQuizClientIp, integrityDedupeKey, isPlausibleIntegrityTime } from "@/features/quiz/integrity";
 import { prisma } from "@/lib/prisma";
+import { hasTrustedMutationOrigin, readBoundedJson } from "@/lib/request-security";
 
 const bodySchema = z.object({ attemptId: z.uuid(), type: z.enum([QuizIntegrityEventType.TAB_HIDDEN, QuizIntegrityEventType.WINDOW_BLUR, QuizIntegrityEventType.COPY, QuizIntegrityEventType.PASTE]), occurredAt: z.iso.datetime() });
 
 export async function POST(request: Request) {
-  const length = Number(request.headers.get("content-length") ?? 0);
-  if (!request.headers.get("content-type")?.startsWith("application/json") || length > 2_048) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!hasTrustedMutationOrigin(request)) return NextResponse.json({ error: "forbidden_origin" }, { status: 403 });
+  const body = await readBoundedJson(request, 2_048);
+  if (!body.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  const parsed = bodySchema.safeParse(body.data);
   if (!parsed.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   const user = await requireAuthenticatedUser();
   const occurredAt = new Date(parsed.data.occurredAt);

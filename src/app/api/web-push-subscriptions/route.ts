@@ -5,12 +5,15 @@ import { z } from "zod";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { canUsePushEndpoint, isAllowedPushEndpoint } from "@/features/notification/push-policy";
 import { prisma } from "@/lib/prisma";
+import { hasTrustedMutationOrigin, readBoundedJson } from "@/lib/request-security";
 
 const schema = z.object({ endpoint: z.url().max(2048), keys: z.object({ p256dh: z.string().min(40).max(180), auth: z.string().min(10).max(80) }) });
 
 export async function POST(request: Request) {
-  if (!request.headers.get("content-type")?.startsWith("application/json") || Number(request.headers.get("content-length") ?? 0) > 4_096) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  if (!hasTrustedMutationOrigin(request)) return NextResponse.json({ error: "forbidden_origin" }, { status: 403 });
+  const body = await readBoundedJson(request, 4_096);
+  if (!body.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  const parsed = schema.safeParse(body.data);
   if (!parsed.success || !isAllowedPushEndpoint(parsed.data.endpoint)) return NextResponse.json({ error: "invalid_subscription" }, { status: 400 });
   const user = await requireAuthenticatedUser();
   const endpointHash = createHash("sha256").update(parsed.data.endpoint).digest("hex");
