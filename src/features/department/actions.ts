@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireOrganizationAccess } from "@/features/organization/guards";
-import { createDepartmentSchema, departmentMemberSchema, departmentMessageSchema } from "./schemas";
+import { createDepartmentSchema, departmentMemberSchema, departmentMessageSchema, updateDepartmentSchema } from "./schemas";
 import { requireDepartmentAccess } from "./guards";
 import { canAccessDepartment } from "./policy";
 import { MAX_DEPARTMENT_MESSAGES_PER_MINUTE } from "@/constants/department";
@@ -26,6 +26,29 @@ export async function createDepartment(formData: FormData) {
   }
   revalidatePath(`/organizations/${parsed.data.organizationId}/departments`);
   redirect(`/organizations/${parsed.data.organizationId}/departments?message=created`);
+}
+
+export async function updateDepartment(formData: FormData) {
+  const parsed = updateDepartmentSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const updated = await transaction.department.updateMany({
+        where: { id: parsed.data.departmentId, organizationId: parsed.data.organizationId, archivedAt: null },
+        data: { name: parsed.data.name, description: parsed.data.description },
+      });
+      if (updated.count !== 1) throw new Error("DEPARTMENT_NOT_FOUND");
+      await transaction.auditLog.create({
+        data: { actorId: user.id, organizationId: parsed.data.organizationId, action: "DEPARTMENT_UPDATED", targetType: "DEPARTMENT", targetId: parsed.data.departmentId },
+      });
+    });
+  } catch {
+    redirect(`/organizations/${parsed.data.organizationId}/departments/${parsed.data.departmentId}?error=department_update_failed`);
+  }
+  revalidatePath(`/organizations/${parsed.data.organizationId}/departments`);
+  revalidatePath(`/organizations/${parsed.data.organizationId}/departments/${parsed.data.departmentId}`);
+  redirect(`/organizations/${parsed.data.organizationId}/departments/${parsed.data.departmentId}?message=department_updated`);
 }
 
 export async function updateDepartmentMembers(formData: FormData) {
