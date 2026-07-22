@@ -14,6 +14,7 @@ export function MarkdownContent({ content }: { content: string }) {
           ol: ({ children }) => <ol className="list-decimal space-y-1 pl-6">{children}</ol>,
           blockquote: ({ children }) => <blockquote className="border-l-4 border-indigo-300 bg-indigo-50 px-4 py-2 text-slate-700 dark:border-indigo-700 dark:bg-indigo-950/50 dark:text-slate-200">{children}</blockquote>,
           a: ({ children, href }) => <a className="text-indigo-600 underline underline-offset-2 dark:text-indigo-300" href={href} rel="noopener noreferrer" target="_blank">{children}</a>,
+          img: ({ alt }) => <span className="text-sm text-slate-500">[이미지: {alt || "설명 없음"}]</span>,
           pre: ({ children }) => <pre className="overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm text-slate-100">{children}</pre>,
           code: ({ children, className }) => className
             ? <code className={className}>{children}</code>
