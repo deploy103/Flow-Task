@@ -8,16 +8,37 @@ import {
   MAX_SUBMISSION_UPLOAD_GRANTS_PER_WINDOW,
 } from "@/constants/assignment";
 
+const MAX_CANCEL_UPLOAD_REQUEST_BODY_BYTES = 4 * 1024;
+
+function hasBoundedContentLength(contentLength: string | null, maximumBytes: number) {
+  const parsedContentLength = Number(contentLength);
+  return (
+    Number.isInteger(parsedContentLength) &&
+    parsedContentLength > 0 &&
+    parsedContentLength <= maximumBytes
+  );
+}
+
 export function hasBoundedSubmissionUploadRequestBody(input: {
   contentType: string | null;
   contentLength: string | null;
 }) {
-  const contentLength = Number(input.contentLength);
   return (
     input.contentType?.startsWith("multipart/form-data") === true &&
-    Number.isInteger(contentLength) &&
-    contentLength > 0 &&
-    contentLength <= MAX_SUBMISSION_FILE_SIZE_BYTES + MAX_SUBMISSION_UPLOAD_REQUEST_BODY_BYTES
+    hasBoundedContentLength(
+      input.contentLength,
+      MAX_SUBMISSION_FILE_SIZE_BYTES + MAX_SUBMISSION_UPLOAD_REQUEST_BODY_BYTES,
+    )
+  );
+}
+
+export function hasBoundedSubmissionUploadCancellationBody(input: {
+  contentType: string | null;
+  contentLength: string | null;
+}) {
+  return (
+    input.contentType?.split(";", 1)[0]?.trim().toLowerCase() === "application/json" &&
+    hasBoundedContentLength(input.contentLength, MAX_CANCEL_UPLOAD_REQUEST_BODY_BYTES)
   );
 }
 
