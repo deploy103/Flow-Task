@@ -1,6 +1,7 @@
 import { DepartmentRole } from "@prisma/client";
 
 export const MAX_DEPARTMENT_NAME_LENGTH = 80;
+export const MIN_DEPARTMENT_NAME_LENGTH = 2;
 export const MAX_DEPARTMENT_DESCRIPTION_LENGTH = 500;
 export const MAX_DEPARTMENT_MESSAGE_LENGTH = 2000;
 export const DEPARTMENT_MESSAGE_PAGE_SIZE = 100;
