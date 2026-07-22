@@ -19,6 +19,7 @@ import {
   QUIZ_QUESTION_TYPE_LABELS,
 } from "@/constants/quiz";
 import { createQuizQuestion } from "@/features/quiz/admin-actions";
+import { serializeQuizChoices } from "@/features/quiz/choice-format";
 
 type ChoiceDraft = { id: number; content: string; isCorrect: boolean };
 type AnswerDraft = { id: number; content: string };
@@ -100,10 +101,7 @@ export function QuizQuestionBuilderForm({
   };
 
   const serializedChoices = usesChoices
-    ? choices.map((choice) => {
-        const content = choice.content.startsWith("*") ? `\\${choice.content}` : choice.content;
-        return `${choice.isCorrect ? "*" : ""}${content}`;
-      }).join("\n")
+    ? serializeQuizChoices(choices)
     : "";
   const serializedAnswers = usesAutomaticTextAnswers
     ? answers.map((answer) => answer.content).join("\n")

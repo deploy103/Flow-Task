@@ -15,24 +15,15 @@ import {
   MAX_QUIZ_TIME_LIMIT_MINUTES,
   MAX_QUIZ_TITLE_LENGTH,
 } from "@/constants/quiz";
+import { parseQuizChoices } from "./choice-format";
+
+export { parseQuizChoices } from "./choice-format";
 
 const checkbox = z.preprocess((value) => value === "on" || value === "true" || value === true, z.boolean());
 const emptyToUndefined = (value: unknown) => typeof value === "string" && value.trim() === "" ? undefined : value ?? undefined;
 const optionalInteger = (min: number, max: number) => z.preprocess(emptyToUndefined, z.coerce.number().int().min(min).max(max).optional());
 const requiredInteger = (min: number, max: number) => z.preprocess(emptyToUndefined, z.coerce.number().int().min(min).max(max));
 const optionalText = (max: number) => z.preprocess(emptyToUndefined, z.string().trim().min(1).max(max).optional());
-
-export function parseQuizChoices(value: string | undefined) {
-  if (!value) return [];
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
-    const isCorrect = line.startsWith("*");
-    const markedContent = isCorrect ? line.slice(1).trim() : line;
-    return {
-      content: markedContent.startsWith("\\*") ? markedContent.slice(1) : markedContent,
-      isCorrect,
-    };
-  });
-}
 
 export function parseQuizAnswerLines(value: string | undefined) {
   if (!value) return [];
