@@ -3,6 +3,7 @@ import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://flow.mvtp.cloud"),
   title: "Flow Task",
   description: "동아리와 팀의 과제·조직 관리 서비스",
   manifest: "/manifest.webmanifest",
