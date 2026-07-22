@@ -42,3 +42,7 @@ ALTER TABLE "department_members" ADD CONSTRAINT "department_members_department_i
 ALTER TABLE "department_members" ADD CONSTRAINT "department_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "department_messages" ADD CONSTRAINT "department_messages_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "department_messages" ADD CONSTRAINT "department_messages_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "departments" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "department_members" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "department_messages" ENABLE ROW LEVEL SECURITY;
