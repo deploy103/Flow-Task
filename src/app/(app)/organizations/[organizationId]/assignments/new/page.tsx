@@ -2,6 +2,7 @@ import { AssignmentAudience, AssignmentFieldType, MembershipStatus } from "@pris
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { BackLink } from "@/components/ui/back-link";
 import { createAssignment } from "@/features/assignment/actions";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { formatKoreanDateTimeInput } from "@/lib/date";
@@ -26,6 +27,7 @@ export default async function NewAssignmentPage({ params, searchParams }: { para
 
   return (
     <div className="max-w-3xl">
+      <BackLink href={`/organizations/${organizationId}/assignments`} label="과제 목록" />
       <p className="text-sm font-semibold text-indigo-600">관리자 전용</p><h1 className="mt-1 text-3xl font-bold">과제 등록</h1><p className="mt-2 text-slate-500">기본 정보와 공개 대상을 설정하세요.</p>
       <Card className="mt-6">
         {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">입력 내용, 날짜와 과제 대상을 확인해 주세요.</p>}
