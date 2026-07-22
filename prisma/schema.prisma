@@ -213,6 +213,7 @@ model User {
   email                   String                    @unique @db.VarChar(320)
   name                    String                    @db.VarChar(50)
   studentNumber           String?                   @map("student_number") @db.VarChar(30)
+  birthDate               DateTime?                 @map("birth_date") @db.Date
   systemRole              SystemRole                @default(USER) @map("system_role")
   createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
