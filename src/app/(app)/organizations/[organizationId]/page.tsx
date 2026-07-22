@@ -1,6 +1,7 @@
 import { MembershipStatus } from "@prisma/client";
 import { ArrowRight, BarChart3, Bell, CalendarDays, CircleHelp, ClipboardList, Settings, Users } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { MEMBERSHIP_ROLE_LABELS } from "@/constants/roles";
@@ -21,8 +22,8 @@ export default async function OrganizationPage({ params }: { params: Promise<{ o
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="text-sm font-semibold text-indigo-600">{membership ? MEMBERSHIP_ROLE_LABELS[membership.role] : "시스템 관리자"}</p><h1 className="mt-1 text-3xl font-bold">{organization.name}</h1><p className="mt-2 max-w-2xl text-slate-500">{organization.description ?? "조직의 활동과 구성원을 한곳에서 관리하세요."}</p></div>
-        {canManage && <Link href={`/organizations/${organizationId}/members`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Settings size={18} /> 구성원 관리</Link>}
+        <div className="flex items-start gap-4">{organization.logoStoragePath && <Image src={`/api/organizations/${organizationId}/logo`} alt={`${organization.name} 로고`} width={72} height={72} unoptimized className="size-16 rounded-2xl border object-cover sm:size-[72px]"/>}<div><p className="text-sm font-semibold text-indigo-600">{membership ? MEMBERSHIP_ROLE_LABELS[membership.role] : "시스템 관리자"}</p><h1 className="mt-1 text-3xl font-bold">{organization.name}</h1><p className="mt-2 max-w-2xl text-slate-500">{organization.description ?? "조직의 활동과 구성원을 한곳에서 관리하세요."}</p></div></div>
+        {canManage && <Link href={`/organizations/${organizationId}/settings`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Settings size={18} /> 조직 설정</Link>}
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {canManage && <Link href={`/organizations/${organizationId}/statistics`} className="block"><Card className="group h-full"><div className="flex items-center justify-between"><span className="rounded-xl bg-cyan-50 p-3 text-cyan-600 dark:bg-cyan-950"><BarChart3 /></span><ArrowRight className="text-slate-400" /></div><h2 className="mt-5 font-bold">통계와 Excel</h2><p className="mt-1 text-sm text-slate-500">제출률·정답률·질문 응답 현황을 확인합니다.</p></Card></Link>}
