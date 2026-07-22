@@ -17,6 +17,18 @@ const policies = {
     ipAttempts: 10,
     globalAttempts: 100,
   },
+  VERIFY: {
+    windowMilliseconds: 60 * 60 * 1_000,
+    accountAttempts: 3,
+    ipAttempts: 10,
+    globalAttempts: 100,
+  },
+  RESET: {
+    windowMilliseconds: 60 * 60 * 1_000,
+    accountAttempts: 3,
+    ipAttempts: 10,
+    globalAttempts: 100,
+  },
 } as const;
 const RATE_LIMIT_RETENTION_MILLISECONDS = 2 * 60 * 60 * 1_000;
 const UNTRUSTED_DIRECT_SOURCE_KEY = "source:untrusted-direct";
