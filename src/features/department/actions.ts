@@ -12,7 +12,7 @@ import { MAX_DEPARTMENT_MESSAGES_PER_MINUTE } from "@/constants/department";
 
 export async function createDepartment(formData: FormData) {
   const parsed = createDepartmentSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect(`/organizations/${String(formData.get("organizationId") ?? "")}/departments?error=invalid_input`);
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
   const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
   try {
     await prisma.$transaction(async (transaction) => {
