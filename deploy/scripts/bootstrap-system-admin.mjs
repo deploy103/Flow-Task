@@ -29,8 +29,8 @@ try {
   await prisma.$transaction(async (transaction) => {
     await transaction.user.upsert({
       where: { email },
-      create: { id: userId, email, name, systemRole: SystemRole.SYSTEM_ADMIN },
-      update: { name, systemRole: SystemRole.SYSTEM_ADMIN },
+      create: { id: userId, email, name, systemRole: SystemRole.SYSTEM_ADMIN, emailVerifiedAt: new Date() },
+      update: { name, systemRole: SystemRole.SYSTEM_ADMIN, emailVerifiedAt: new Date() },
     });
     await transaction.userCredential.upsert({
       where: { userId },
