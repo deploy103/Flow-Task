@@ -16,6 +16,7 @@ import { createSubmissionStoragePath, removeSubmissionFile, uploadSubmissionFile
 import { getSubmissionUploadLifecycle } from "@/features/submission/upload-lifecycle";
 import {
   evaluateSubmissionUploadGrant,
+  hasBoundedSubmissionUploadCancellationBody,
   hasBoundedSubmissionUploadRequestBody,
 } from "@/features/submission/upload-policy";
 import { prisma } from "@/lib/prisma";
@@ -27,8 +28,15 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
 
-function hasBoundedJsonBody(request: Request) {
+function hasBoundedUploadBody(request: Request) {
   return hasBoundedSubmissionUploadRequestBody({
+    contentType: request.headers.get("content-type"),
+    contentLength: request.headers.get("content-length"),
+  });
+}
+
+function hasBoundedCancellationBody(request: Request) {
+  return hasBoundedSubmissionUploadCancellationBody({
     contentType: request.headers.get("content-type"),
     contentLength: request.headers.get("content-length"),
   });
@@ -68,7 +76,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ organizationId: string; assignmentId: string }> },
 ) {
-  if (!hasBoundedJsonBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
+  if (!hasBoundedUploadBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
   const parsedParams = routeParamsSchema.safeParse(await params);
   if (!parsedParams.success) return jsonError("INVALID_PATH", "요청 경로가 올바르지 않습니다.", 400);
   const { organizationId, assignmentId } = parsedParams.data;
@@ -242,7 +250,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ organizationId: string; assignmentId: string }> },
 ) {
-  if (!hasBoundedJsonBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
+  if (!hasBoundedCancellationBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
   const parsedParams = routeParamsSchema.safeParse(await params);
   if (!parsedParams.success) return jsonError("INVALID_PATH", "요청 경로가 올바르지 않습니다.", 400);
   const { organizationId, assignmentId } = parsedParams.data;
