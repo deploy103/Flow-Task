@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:db": "RUN_DATABASE_TESTS=1 vitest run src/features/auth/rate-limit.integration.test.ts",
+    "test:db": "RUN_DATABASE_TESTS=1 vitest run src/features/auth/rate-limit.integration.test.ts src/features/auth/email-auth.integration.test.ts",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
