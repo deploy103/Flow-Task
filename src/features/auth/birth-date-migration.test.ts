@@ -11,4 +11,10 @@ describe("birth date migration", () => {
     expect(migration).toContain('ADD COLUMN "birth_date" DATE');
     expect(migration).not.toContain("NOT NULL");
   });
+
+  it("records complete versioned consent evidence", () => {
+    expect(migration).toContain('ADD COLUMN "privacy_consent_at" TIMESTAMPTZ(6)');
+    expect(migration).toContain('ADD COLUMN "privacy_consent_version" VARCHAR(20)');
+    expect(migration).toContain('CONSTRAINT "users_privacy_consent_complete_check"');
+  });
 });
