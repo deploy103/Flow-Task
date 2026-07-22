@@ -19,4 +19,11 @@ describe("announcement markdown", () => {
     expect(html).not.toContain("<script>");
     expect(html).not.toContain('href="javascript:');
   });
+
+  it("does not load external markdown images", () => {
+    const html = renderMarkdown("![추적](https://example.invalid/pixel)");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain('src="https://example.invalid/pixel"');
+    expect(html).toContain("[이미지: 추적]");
+  });
 });
