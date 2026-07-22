@@ -9,6 +9,10 @@ export const emailRequestSchema = z.object({
   email: z.string().trim().email("올바른 이메일을 입력해 주세요."),
 });
 
+export const verificationTokenSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
+
 export const passwordResetSchema = z.object({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다.").max(128),

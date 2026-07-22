@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailRequestSchema, loginSchema, passwordResetSchema, signUpSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordResetSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
@@ -29,5 +29,10 @@ describe("auth schemas", () => {
 
   it("normalizes email requests through validation", () => {
     expect(emailRequestSchema.parse({ email: "  Student@Example.com " }).email).toBe("Student@Example.com");
+  });
+
+  it("accepts only an opaque verification token", () => {
+    expect(verificationTokenSchema.safeParse({ token: "a".repeat(43) }).success).toBe(true);
+    expect(verificationTokenSchema.safeParse({ token: "a".repeat(42) }).success).toBe(false);
   });
 });
