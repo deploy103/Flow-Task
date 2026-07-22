@@ -18,6 +18,9 @@ export function AuthShell({
         <h1 className="mt-5 text-3xl font-bold tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{description}</p>
         {children}
+        <div className="mt-6 border-t border-slate-100 pt-4 text-center dark:border-slate-800">
+          <Link href="/privacy" className="text-xs text-slate-500 underline underline-offset-4">개인정보처리방침</Link>
+        </div>
       </section>
     </main>
   );

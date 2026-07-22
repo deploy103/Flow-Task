@@ -51,6 +51,9 @@ export function AppShell({
           </form>
         </header>
         <main className="mx-auto max-w-6xl p-4 sm:p-8">{children}</main>
+        <footer className="mx-auto max-w-6xl px-4 pb-24 text-right sm:px-8 lg:pb-8">
+          <Link href="/privacy" className="text-xs text-slate-500 underline underline-offset-4">개인정보처리방침</Link>
+        </footer>
       </div>
       <nav className={`fixed inset-x-0 bottom-0 z-20 grid border-t border-slate-200 bg-white px-2 py-2 dark:border-slate-800 dark:bg-slate-950 lg:hidden ${isSystemAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
         {visibleNavigation.map(({ href, label, icon: Icon }) => (
