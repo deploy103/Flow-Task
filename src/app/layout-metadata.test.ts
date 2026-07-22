@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { viewport } from "./layout";
+import { metadata, viewport } from "./layout";
 
 describe("root viewport metadata", () => {
   it("enables iOS safe-area viewport insets", () => {
@@ -7,6 +7,13 @@ describe("root viewport metadata", () => {
       width: "device-width",
       initialScale: 1,
       viewportFit: "cover",
+    });
+  });
+
+  it("publishes the Flow Task icon as the browser favicon", () => {
+    expect(metadata.icons).toEqual({
+      icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+      shortcut: "/icon.svg",
     });
   });
 });
