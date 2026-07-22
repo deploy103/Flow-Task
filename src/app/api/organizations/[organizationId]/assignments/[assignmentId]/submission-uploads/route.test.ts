@@ -61,6 +61,7 @@ describe("DELETE submission upload", () => {
       headers: {
         "Content-Type": "application/json",
         "Content-Length": String(new TextEncoder().encode(body).byteLength),
+        Origin: "http://localhost",
       },
       body,
     });
@@ -75,5 +76,19 @@ describe("DELETE submission upload", () => {
     await expect(response.json()).resolves.toEqual({ success: true, data: { cancelled: 1 } });
     expect(mocks.updateUploads).toHaveBeenCalledOnce();
     expect(mocks.removeSubmissionFile).toHaveBeenCalledWith("safe/path/file.pdf");
+  });
+
+  it("rejects a cross-site cancellation before authentication or database access", async () => {
+    const body = JSON.stringify({ uploadIds: [uploadId] });
+    const request = new Request("http://localhost/submission-uploads", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
+      body,
+    });
+    const response = await DELETE(request, { params: Promise.resolve({ organizationId, assignmentId }) });
+    expect(response).toBeDefined();
+    if (!response) throw new Error("Expected an origin rejection response.");
+    expect(response.status).toBe(403);
+    expect(mocks.getApiUser).not.toHaveBeenCalled();
   });
 });
