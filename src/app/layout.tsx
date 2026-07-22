@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "Flow Task",
   description: "동아리와 팀의 과제·조직 관리 서비스",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
