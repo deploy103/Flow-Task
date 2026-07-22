@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_DEPARTMENT_NAME_LENGTH, MIN_DEPARTMENT_NAME_LENGTH } from "@/constants/department";
 import { createDepartmentSchema, departmentMemberSchema, departmentMessageSchema, updateDepartmentSchema } from "./schemas";
 
 const organizationId = "550e8400-e29b-41d4-a716-446655440000";
@@ -8,6 +9,12 @@ const userId = "16768a06-470c-4d5a-9d26-ec7e8f4f82a0";
 describe("department schemas", () => {
   it("normalizes a department description", () => {
     expect(createDepartmentSchema.parse({ organizationId, name: "기능부", description: "" }).description).toBeNull();
+  });
+
+  it("enforces the shared department name length policy", () => {
+    expect(createDepartmentSchema.safeParse({ organizationId, name: "a".repeat(MIN_DEPARTMENT_NAME_LENGTH - 1), description: "" }).success).toBe(false);
+    expect(createDepartmentSchema.safeParse({ organizationId, name: "a".repeat(MIN_DEPARTMENT_NAME_LENGTH), description: "" }).success).toBe(true);
+    expect(createDepartmentSchema.safeParse({ organizationId, name: "a".repeat(MAX_DEPARTMENT_NAME_LENGTH + 1), description: "" }).success).toBe(false);
   });
 
   it("requires both organization and department scope for updates", () => {
