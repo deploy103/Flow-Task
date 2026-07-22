@@ -1,6 +1,7 @@
 import { AssignmentAudience, AssignmentFieldType } from "@prisma/client";
 import { z } from "zod";
 import {
+  ASSIGNMENT_SETUP_TYPE,
   KOREAN_TIME_OFFSET_MILLISECONDS,
   MAX_ASSIGNMENT_DESCRIPTION_LENGTH,
   MAX_ASSIGNMENT_TARGET_COUNT,
@@ -81,6 +82,7 @@ const koreanLocalDateTimeSchema = z
 export const createAssignmentSchema = z
   .object({
     organizationId: z.uuid(),
+    setupType: z.enum(Object.values(ASSIGNMENT_SETUP_TYPE)),
     title: z.string().trim().min(1, "제목을 입력해 주세요.").max(MAX_ASSIGNMENT_TITLE_LENGTH),
     description: z
       .string()
