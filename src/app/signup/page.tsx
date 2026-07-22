@@ -4,6 +4,7 @@ import { AuthNotice } from "@/components/auth/auth-notice";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PRIVACY_POLICY_VERSION } from "@/constants/privacy";
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const notice = await searchParams;
@@ -24,7 +25,8 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             <li>목적: 회원 식별, 연령 확인, 로그인 및 Flow Task 서비스 제공, 보안 사고 대응</li>
             <li>기간: 회원 탈퇴 처리 완료 시까지. 법령상 의무가 있으면 해당 기간까지</li>
           </ul>
-          <p className="mt-2">동의를 거부할 수 있으나 필수 정보 처리에 동의하지 않으면 가입할 수 없습니다. 자세한 내용은 <Link href="/privacy" target="_blank" className="font-semibold text-indigo-600 underline">개인정보처리방침</Link>에서 확인하세요.</p>
+          <p className="mt-2">동의를 거부할 수 있으나 필수 정보 처리에 동의하지 않으면 가입할 수 없습니다. 자세한 내용은 <Link href="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-indigo-600 underline">개인정보처리방침</Link>에서 확인하세요.</p>
+          <p className="mt-1 text-slate-500">적용 방침 버전: {PRIVACY_POLICY_VERSION}</p>
         </div>
         <label className="flex items-start gap-3 text-sm font-medium"><input name="privacyConsent" type="checkbox" required className="mt-1 size-4" /><span><span className="text-indigo-600">[필수]</span> 개인정보 수집·이용에 동의합니다.</span></label>
         <Button type="submit" className="w-full">회원가입</Button>
