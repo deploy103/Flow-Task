@@ -1,4 +1,14 @@
 import { z } from "zod";
+import { parseBirthDate } from "./birth-date";
+
+const birthDateSchema = z.string().transform((value, context) => {
+  const birthDate = parseBirthDate(value);
+  if (!birthDate) {
+    context.addIssue({ code: "custom", message: "생년월일을 확인해 주세요." });
+    return z.NEVER;
+  }
+  return birthDate;
+});
 
 export const loginSchema = z.object({
   email: z.string().trim().email("올바른 이메일을 입력해 주세요."),
@@ -24,6 +34,8 @@ export const passwordResetSchema = z.object({
 
 export const signUpSchema = loginSchema.extend({
   name: z.string().trim().min(2, "이름은 2자 이상이어야 합니다.").max(50),
+  birthDate: birthDateSchema,
+  passwordConfirmation: z.string().min(8).max(128),
   studentNumber: z
     .string()
     .trim()
@@ -31,10 +43,14 @@ export const signUpSchema = loginSchema.extend({
     .regex(/^[0-9A-Za-z-]*$/, "학번 형식을 확인해 주세요.")
     .optional()
     .transform((value) => value || undefined),
+}).refine((value) => value.password === value.passwordConfirmation, {
+  message: "비밀번호가 일치하지 않습니다.",
+  path: ["passwordConfirmation"],
 });
 
 export const profileSchema = z.object({
   name: z.string().trim().min(2).max(50),
+  birthDate: birthDateSchema,
   studentNumber: z
     .string()
     .trim()
