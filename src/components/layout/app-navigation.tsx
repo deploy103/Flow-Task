@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { isNavigationItemActive } from "./navigation";
+import { NotificationBadge } from "./notification-badge";
 
 const navigation = [
   { href: "/dashboard", label: "홈", icon: Home },
@@ -23,7 +24,6 @@ export function AppNavigation({
   mobile?: boolean;
 }) {
   const pathname = usePathname();
-  const unreadLabel = `읽지 않은 알림 ${Math.min(unreadNotifications, 99)}개`;
   const items = isSystemAdmin
     ? [...navigation, { href: "/admin", label: "시스템 관리", icon: ShieldCheck }]
     : navigation;
@@ -46,17 +46,7 @@ export function AppNavigation({
       >
         <Icon aria-hidden="true" size={19} />
         {label}
-        {href === "/notifications" && unreadNotifications > 0 && (
-          <span
-            aria-label={unreadLabel}
-            className={cn(
-              "rounded-full bg-red-500 px-1 text-center text-[10px] text-white",
-              mobile ? "absolute ml-5 -mt-7 min-w-5" : "ml-auto px-2 py-0.5 text-xs",
-            )}
-          >
-            {Math.min(unreadNotifications, 99)}
-          </span>
-        )}
+        {href === "/notifications" && <NotificationBadge count={unreadNotifications} mobile={mobile} />}
       </Link>
     );
   });
