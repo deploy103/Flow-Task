@@ -16,6 +16,7 @@ import { buildAuthLink } from "./token";
 import { consumeEmailVerificationToken, issueEmailVerificationToken } from "./email-verification";
 import { issuePasswordResetToken, resetPasswordWithToken } from "./password-reset";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
+import { PRIVACY_POLICY_VERSION } from "@/constants/privacy";
 
 export async function login(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
@@ -57,6 +58,9 @@ export async function signUp(formData: FormData) {
         email,
         name: parsed.data.name,
         studentNumber: parsed.data.studentNumber,
+        birthDate: parsed.data.birthDate,
+        privacyConsentAt: new Date(),
+        privacyConsentVersion: PRIVACY_POLICY_VERSION,
         credential: { create: { passwordHash } },
         auditLogs: {
           create: { action: "USER_REGISTERED", targetType: "USER", targetId: id },
