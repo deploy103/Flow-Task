@@ -14,4 +14,9 @@ describe("department migration", () => {
     expect(migration).toContain("ON DELETE CASCADE");
     expect(migration).toContain('department_messages_author_id_fkey');
   });
+  it("enables row level security on every department table", () => {
+    for (const table of ["departments", "department_members", "department_messages"]) {
+      expect(migration).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+    }
+  });
 });
