@@ -57,6 +57,7 @@ export async function signUp(formData: FormData) {
         email,
         name: parsed.data.name,
         studentNumber: parsed.data.studentNumber,
+        birthDate: parsed.data.birthDate,
         credential: { create: { passwordHash } },
         auditLogs: {
           create: { action: "USER_REGISTERED", targetType: "USER", targetId: id },

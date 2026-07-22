@@ -17,6 +17,7 @@ const baseUser: User = {
   email: "member@example.com",
   name: "테스트 사용자",
   studentNumber: null,
+  birthDate: null,
   systemRole: SystemRole.USER,
   createdAt: new Date("2026-07-21T00:00:00Z"),
   updatedAt: new Date("2026-07-21T00:00:00Z"),

@@ -14,10 +14,26 @@ describe("auth schemas", () => {
     const result = signUpSchema.parse({
       email: "student@example.com",
       password: "safe-password",
+      passwordConfirmation: "safe-password",
       name: "김학생",
+      birthDate: "2008-03-01",
       studentNumber: "",
     });
     expect(result.studentNumber).toBeUndefined();
+  });
+
+  it("rejects invalid birth dates and mismatched signup passwords", () => {
+    const valid = {
+      email: "student@example.com",
+      password: "safe-password",
+      passwordConfirmation: "safe-password",
+      name: "김학생",
+      birthDate: "2008-03-01",
+      studentNumber: "",
+    };
+    expect(signUpSchema.safeParse({ ...valid, birthDate: "2008-02-30" }).success).toBe(false);
+    expect(signUpSchema.safeParse({ ...valid, birthDate: "2999-01-01" }).success).toBe(false);
+    expect(signUpSchema.safeParse({ ...valid, passwordConfirmation: "other-password" }).success).toBe(false);
   });
 
   it("validates password reset confirmation and token shape", () => {
