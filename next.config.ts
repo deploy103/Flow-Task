@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { getSecurityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -7,6 +8,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "1mb",
     },
+  },
+  async headers() {
+    return [{ source: "/:path*", headers: getSecurityHeaders(process.env.NODE_ENV === "production") }];
   },
 };
 
