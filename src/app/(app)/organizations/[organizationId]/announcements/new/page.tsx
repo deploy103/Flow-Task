@@ -2,6 +2,7 @@ import { AnnouncementAudience, AnnouncementPriority, MembershipStatus } from "@p
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { BackLink } from "@/components/ui/back-link";
 import { createAnnouncement } from "@/features/announcement/actions";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +19,7 @@ export default async function NewAnnouncementPage({ params, searchParams }: { pa
 
   return (
     <div className="max-w-3xl">
+      <BackLink href={`/organizations/${organizationId}/announcements`} label="공지 목록" />
       <p className="text-sm font-semibold text-indigo-600">관리자 전용</p><h1 className="mt-1 text-3xl font-bold">공지 작성</h1>
       <Card className="mt-6">
         {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">입력 내용과 공지 대상을 확인해 주세요.</p>}
