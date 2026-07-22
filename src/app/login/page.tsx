@@ -23,6 +23,7 @@ export default async function LoginPage({
           비밀번호
           <Input name="password" type="password" autoComplete="current-password" minLength={8} required className="mt-2" />
         </label>
+        <div className="text-right"><Link href="/forgot-password" className="text-sm font-semibold text-indigo-600">비밀번호를 잊으셨나요?</Link></div>
         <Button type="submit" className="w-full">로그인</Button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema, signUpSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordResetSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
@@ -18,5 +18,21 @@ describe("auth schemas", () => {
       studentNumber: "",
     });
     expect(result.studentNumber).toBeUndefined();
+  });
+
+  it("validates password reset confirmation and token shape", () => {
+    const token = "a".repeat(43);
+    expect(passwordResetSchema.safeParse({ token, password: "new-password", passwordConfirmation: "new-password" }).success).toBe(true);
+    expect(passwordResetSchema.safeParse({ token, password: "new-password", passwordConfirmation: "different-password" }).success).toBe(false);
+    expect(passwordResetSchema.safeParse({ token: "short", password: "new-password", passwordConfirmation: "new-password" }).success).toBe(false);
+  });
+
+  it("normalizes email requests through validation", () => {
+    expect(emailRequestSchema.parse({ email: "  Student@Example.com " }).email).toBe("Student@Example.com");
+  });
+
+  it("accepts only an opaque verification token", () => {
+    expect(verificationTokenSchema.safeParse({ token: "a".repeat(43) }).success).toBe(true);
+    expect(verificationTokenSchema.safeParse({ token: "a".repeat(42) }).success).toBe(false);
   });
 });
