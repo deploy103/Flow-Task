@@ -24,10 +24,14 @@ const optionalText = (max: number) => z.preprocess(emptyToUndefined, z.string().
 
 export function parseQuizChoices(value: string | undefined) {
   if (!value) return [];
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => ({
-    content: line.startsWith("*") ? line.slice(1).trim() : line,
-    isCorrect: line.startsWith("*"),
-  }));
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const isCorrect = line.startsWith("*");
+    const markedContent = isCorrect ? line.slice(1).trim() : line;
+    return {
+      content: markedContent.startsWith("\\*") ? markedContent.slice(1) : markedContent,
+      isCorrect,
+    };
+  });
 }
 
 export function parseQuizAnswerLines(value: string | undefined) {
