@@ -33,8 +33,15 @@ describeWithDatabase("email verification and password reset database behavior", 
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { id: { in: [...userIds] } } });
-    await prisma.$disconnect();
+    const ids = [...userIds];
+    try {
+      await prisma.$transaction([
+        prisma.auditLog.deleteMany({ where: { actorId: { in: ids } } }),
+        prisma.user.deleteMany({ where: { id: { in: ids } } }),
+      ]);
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it("does not consume a verification token while rendering the initial GET page", async () => {
