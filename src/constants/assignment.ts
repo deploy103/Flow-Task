@@ -48,3 +48,40 @@ export const ASSIGNMENT_FIELD_LABELS = {
   FILE: "결과 파일",
   LINK: "관련 링크",
 } as const;
+
+export const ASSIGNMENT_SETUP_TYPE = {
+  GENERAL_SUBMISSION: "GENERAL_SUBMISSION",
+  ONLINE_QUIZ: "ONLINE_QUIZ",
+  STATIC_CTF: "STATIC_CTF",
+  EXTERNAL_CHALLENGE: "EXTERNAL_CHALLENGE",
+} as const;
+
+export type AssignmentSetupType =
+  (typeof ASSIGNMENT_SETUP_TYPE)[keyof typeof ASSIGNMENT_SETUP_TYPE];
+
+export const ASSIGNMENT_SETUP_OPTIONS: ReadonlyArray<{
+  value: AssignmentSetupType;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: ASSIGNMENT_SETUP_TYPE.GENERAL_SUBMISSION,
+    label: "일반 과제",
+    description: "글, 파일 또는 링크를 제출받습니다.",
+  },
+  {
+    value: ASSIGNMENT_SETUP_TYPE.ONLINE_QUIZ,
+    label: "온라인 퀴즈",
+    description: "과제 저장 후 객관식·주관식 문항을 구성합니다.",
+  },
+  {
+    value: ASSIGNMENT_SETUP_TYPE.STATIC_CTF,
+    label: "정적 CTF",
+    description: "문제 파일과 플래그만 등록하는 CTF를 구성합니다.",
+  },
+  {
+    value: ASSIGNMENT_SETUP_TYPE.EXTERNAL_CHALLENGE,
+    label: "외부 문제",
+    description: "DreamHack 등 외부 문제 링크와 채점 조건을 구성합니다.",
+  },
+];

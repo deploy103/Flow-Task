@@ -1,4 +1,4 @@
-import { ChallengeCategory, ChallengeConnectionProtocol, InternalChallengeMode } from "@prisma/client";
+import { ChallengeCategory, InternalChallengeMode } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { createInternalChallengeSchema, parseChallengeHints } from "./internal-schemas";
 
@@ -21,16 +21,12 @@ describe("internal challenge schemas", () => {
     expect(parseChallengeHints(result.success ? result.data.hints : undefined)).toEqual(["첫 번째", "두 번째"]);
   });
 
-  it("requires complete shared server connection data", () => {
+  it("rejects every new server-backed challenge mode", () => {
     expect(createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.SHARED_SERVER }).success).toBe(false);
-    const result = createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.SHARED_SERVER, protocol: ChallengeConnectionProtocol.TCP, host: "challenge.example.com", port: "31337" });
-    expect(result.success, result.success ? "" : JSON.stringify(result.error.issues)).toBe(true);
+    expect(createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.PERSONAL_INSTANCE }).success).toBe(false);
   });
 
-  it("rejects URL-like hosts, invalid ports, inconsistent modes and missing flags", () => {
-    expect(createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.SHARED_SERVER, protocol: ChallengeConnectionProtocol.HTTPS, host: "https://example.com", port: "443" }).success).toBe(false);
-    expect(createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.SHARED_SERVER, protocol: ChallengeConnectionProtocol.TCP, host: "example.com", port: "65536" }).success).toBe(false);
-    expect(createInternalChallengeSchema.safeParse({ ...base, mode: InternalChallengeMode.STATIC_FILE, protocol: ChallengeConnectionProtocol.TCP, host: "example.com", port: "1" }).success).toBe(false);
+  it("rejects missing flags", () => {
     expect(createInternalChallengeSchema.safeParse({ ...base, flag: "", mode: InternalChallengeMode.STATIC_FILE }).success).toBe(false);
   });
 
