@@ -1,5 +1,6 @@
 import { QuizQuestionType, QuizResultRelease } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { serializeQuizChoices } from "./choice-format";
 import { createQuizQuestionSchema, createQuizSchema, parseQuizChoices, parseQuizTags } from "./schemas";
 
 const context = { organizationId: "11111111-1111-4111-8111-111111111111", assignmentId: "22222222-2222-4222-8222-222222222222" };
@@ -22,6 +23,24 @@ describe("quiz schemas", () => {
       { content: "*별표로 시작", isCorrect: false },
       { content: "*별표가 포함된 정답", isCorrect: true },
     ]);
+    const serialized = serializeQuizChoices([
+      { content: "정답", isCorrect: true },
+      { content: " *선행 공백 뒤 별표로 시작하는 오답", isCorrect: false },
+    ]);
+    expect(parseQuizChoices(serialized)).toEqual([
+      { content: "정답", isCorrect: true },
+      { content: "*선행 공백 뒤 별표로 시작하는 오답", isCorrect: false },
+    ]);
+    expect(createQuizQuestionSchema.safeParse({
+      ...context,
+      quizId: "33333333-3333-4333-8333-333333333333",
+      type: QuizQuestionType.MULTIPLE_CHOICE,
+      prompt: "정답?",
+      points: "5",
+      difficulty: "초급",
+      choices: serialized,
+      required: "on",
+    }).success).toBe(true);
     expect(parseQuizTags("Web, SQLi, Web")).toEqual(["Web", "SQLi"]);
   });
 });
