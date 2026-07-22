@@ -1,3 +1,5 @@
+import { MINIMUM_SIGNUP_AGE } from "@/constants/privacy";
+
 export const MAXIMUM_SUPPORTED_AGE = 150;
 
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -39,6 +41,10 @@ export function calculateAge(birthDate: Date, asOf = new Date()) {
     (koreanAsOf.getUTCMonth() === birthDate.getUTCMonth() && koreanAsOf.getUTCDate() >= birthDate.getUTCDate());
   if (!birthdayHasPassed) age -= 1;
   return age;
+}
+
+export function hasMinimumSignupAge(birthDate: Date, asOf = new Date()) {
+  return calculateAge(birthDate, asOf) >= MINIMUM_SIGNUP_AGE;
 }
 
 export function formatDateOnly(date: Date) {

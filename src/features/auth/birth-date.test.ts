@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateAge, formatDateOnly, parseBirthDate } from "./birth-date";
+import { calculateAge, formatDateOnly, hasMinimumSignupAge, parseBirthDate } from "./birth-date";
 
 describe("birth date", () => {
   const today = new Date("2026-07-23T12:00:00Z");
@@ -21,5 +21,14 @@ describe("birth date", () => {
     expect(calculateAge(birthDate, new Date("2026-07-22T00:00:00Z"))).toBe(17);
     expect(calculateAge(birthDate, new Date("2026-07-23T00:00:00Z"))).toBe(18);
     expect(calculateAge(birthDate, new Date("2026-07-22T15:00:00Z"))).toBe(18);
+  });
+
+  it("enforces the 14-year signup boundary in Korean time", () => {
+    const beforeBirthday = new Date("2012-07-24T00:00:00Z");
+    const onBirthday = new Date("2012-07-23T00:00:00Z");
+    expect(hasMinimumSignupAge(beforeBirthday, today)).toBe(false);
+    expect(hasMinimumSignupAge(onBirthday, today)).toBe(true);
+    expect(hasMinimumSignupAge(onBirthday, new Date("2026-07-22T14:59:59Z"))).toBe(false);
+    expect(hasMinimumSignupAge(onBirthday, new Date("2026-07-22T15:00:00Z"))).toBe(true);
   });
 });
