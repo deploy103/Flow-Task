@@ -1,9 +1,14 @@
 import { z } from "zod";
-import { MAX_DEPARTMENT_DESCRIPTION_LENGTH, MAX_DEPARTMENT_MESSAGE_LENGTH, MAX_DEPARTMENT_NAME_LENGTH } from "@/constants/department";
+import {
+  MAX_DEPARTMENT_DESCRIPTION_LENGTH,
+  MAX_DEPARTMENT_MESSAGE_LENGTH,
+  MAX_DEPARTMENT_NAME_LENGTH,
+  MIN_DEPARTMENT_NAME_LENGTH,
+} from "@/constants/department";
 
 export const createDepartmentSchema = z.object({
   organizationId: z.uuid(),
-  name: z.string().trim().min(2).max(MAX_DEPARTMENT_NAME_LENGTH),
+  name: z.string().trim().min(MIN_DEPARTMENT_NAME_LENGTH).max(MAX_DEPARTMENT_NAME_LENGTH),
   description: z.string().trim().max(MAX_DEPARTMENT_DESCRIPTION_LENGTH).transform((value) => value || null),
 });
 
