@@ -12,8 +12,10 @@ import {
   invitationSchema,
   joinOrganizationSchema,
   organizationSchema,
+  organizationSettingsSchema,
   updateMemberRoleSchema,
 } from "./schemas";
+import { organizationLogoPath, removeOrganizationLogo, uploadOrganizationLogo, validateOrganizationLogo } from "./logo-storage";
 
 export type InvitationActionState = {
   success: boolean;
@@ -236,4 +238,69 @@ export async function updateMemberRole(formData: FormData) {
 
   revalidatePath(`/organizations/${parsed.data.organizationId}/members`);
   redirect(`/organizations/${parsed.data.organizationId}/members?message=role_updated`);
+}
+
+export async function updateOrganizationSettings(formData: FormData) {
+  const parsed = organizationSettingsSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+
+  let logo: Awaited<ReturnType<typeof validateOrganizationLogo>>;
+  try {
+    logo = await validateOrganizationLogo(formData.get("logo"));
+    if (logo && parsed.data.removeLogo) throw new Error("CONFLICTING_LOGO_ACTION");
+  } catch {
+    redirect(`/organizations/${parsed.data.organizationId}/settings?error=invalid_logo`);
+  }
+
+  const current = await prisma.organization.findFirst({
+    where: { id: parsed.data.organizationId, archivedAt: null },
+    select: { logoStoragePath: true },
+  });
+  if (!current) redirect("/dashboard?error=organization_not_found");
+
+  const newStoragePath = logo ? organizationLogoPath(parsed.data.organizationId, logo.extension) : null;
+  if (logo && newStoragePath) {
+    try {
+      await uploadOrganizationLogo(newStoragePath, logo.file);
+    } catch {
+      redirect(`/organizations/${parsed.data.organizationId}/settings?error=upload_failed`);
+    }
+  }
+
+  const logoChanged = Boolean(logo || parsed.data.removeLogo);
+  try {
+    await prisma.$transaction([
+      prisma.organization.update({
+        where: { id: parsed.data.organizationId },
+        data: {
+          name: parsed.data.name,
+          description: parsed.data.description,
+          ...(logo ? { logoStoragePath: newStoragePath, logoMimeType: logo.mimeType, logoUpdatedAt: new Date() } : {}),
+          ...(parsed.data.removeLogo ? { logoStoragePath: null, logoMimeType: null, logoUpdatedAt: null } : {}),
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          organizationId: parsed.data.organizationId,
+          action: "ORGANIZATION_SETTINGS_UPDATED",
+          targetType: "ORGANIZATION",
+          targetId: parsed.data.organizationId,
+          metadata: { logoChanged },
+        },
+      }),
+    ]);
+  } catch {
+    if (newStoragePath) await removeOrganizationLogo(newStoragePath).catch(() => undefined);
+    redirect(`/organizations/${parsed.data.organizationId}/settings?error=update_failed`);
+  }
+
+  if (logoChanged && current.logoStoragePath && current.logoStoragePath !== newStoragePath) {
+    await removeOrganizationLogo(current.logoStoragePath).catch(() => undefined);
+  }
+  revalidatePath(`/organizations/${parsed.data.organizationId}`);
+  revalidatePath(`/organizations/${parsed.data.organizationId}/settings`);
+  revalidatePath("/", "layout");
+  redirect(`/organizations/${parsed.data.organizationId}/settings?message=updated`);
 }
