@@ -23,6 +23,11 @@ enum MembershipStatus {
   INACTIVE
 }
 
+enum DepartmentRole {
+  MEMBER
+  LEAD
+}
+
 enum AnnouncementPriority {
   NORMAL
   IMPORTANT
@@ -251,6 +256,9 @@ model User {
   sessions                AuthSession[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  departmentMemberships   DepartmentMember[]
+  departmentMessages      DepartmentMessage[]
+  createdDepartments      Department[]              @relation("DepartmentCreator")
 
   @@map("users")
 }
@@ -343,9 +351,56 @@ model Organization {
   mentorRelations MentorRelation[]
   quizQuestions   QuizQuestion[]
   integrations    OrganizationIntegration[]
+  departments     Department[]
 
   @@index([createdById])
   @@map("organizations")
+}
+
+model Department {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  name           String              @db.VarChar(80)
+  description    String?             @db.VarChar(500)
+  createdById    String              @map("created_by_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt     DateTime?           @map("archived_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User                @relation("DepartmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members        DepartmentMember[]
+  messages       DepartmentMessage[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, archivedAt])
+  @@map("departments")
+}
+
+model DepartmentMember {
+  departmentId String         @map("department_id") @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  role         DepartmentRole @default(MEMBER)
+  joinedAt     DateTime       @default(now()) @map("joined_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  department   Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([departmentId, userId])
+  @@index([userId, departmentId])
+  @@map("department_members")
+}
+
+model DepartmentMessage {
+  id           String     @id @default(uuid()) @db.Uuid
+  departmentId String     @map("department_id") @db.Uuid
+  authorId     String     @map("author_id") @db.Uuid
+  content      String     @db.VarChar(2000)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId, createdAt])
+  @@map("department_messages")
 }
 
 model OrganizationMember {
