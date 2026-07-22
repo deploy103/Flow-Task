@@ -7,6 +7,10 @@ export const createDepartmentSchema = z.object({
   description: z.string().trim().max(MAX_DEPARTMENT_DESCRIPTION_LENGTH).transform((value) => value || null),
 });
 
+export const updateDepartmentSchema = createDepartmentSchema.extend({
+  departmentId: z.uuid(),
+});
+
 export const departmentMemberSchema = z.object({
   organizationId: z.uuid(),
   departmentId: z.uuid(),
