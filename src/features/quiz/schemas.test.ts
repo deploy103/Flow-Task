@@ -18,6 +18,10 @@ describe("quiz schemas", () => {
 
   it("keeps answer and tag parsing deterministic", () => {
     expect(parseQuizChoices("  *정답\n오답 ")).toEqual([{ content: "정답", isCorrect: true }, { content: "오답", isCorrect: false }]);
+    expect(parseQuizChoices("\\*별표로 시작\n**별표가 포함된 정답")).toEqual([
+      { content: "*별표로 시작", isCorrect: false },
+      { content: "*별표가 포함된 정답", isCorrect: true },
+    ]);
     expect(parseQuizTags("Web, SQLi, Web")).toEqual(["Web", "SQLi"]);
   });
 });
