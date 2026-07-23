@@ -1,6 +1,6 @@
 "use server";
 
-import { AssignmentItemType, InternalChallengeMode, Prisma } from "@prisma/client";
+import { AssignmentItemType, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrganizationAccess } from "@/features/organization/guards";
@@ -41,7 +41,7 @@ export async function createInternalChallenge(formData: FormData) {
   } catch {
     challengeRedirect(organizationId, assignmentId, "invalid_resource");
   }
-  if (parsed.data.mode === InternalChallengeMode.STATIC_FILE && !resource) {
+  if (!resource) {
     challengeRedirect(organizationId, assignmentId, "resource_required");
   }
 
@@ -101,13 +101,13 @@ export async function createInternalChallenge(formData: FormData) {
                 difficulty: parsed.data.difficulty,
                 points: parsed.data.points,
                 mode: parsed.data.mode,
-                protocol: parsed.data.mode === InternalChallengeMode.SHARED_SERVER ? parsed.data.protocol : null,
-                host: parsed.data.mode === InternalChallengeMode.SHARED_SERVER ? parsed.data.host : null,
-                port: parsed.data.mode === InternalChallengeMode.SHARED_SERVER ? parsed.data.port : null,
-                instanceTemplateRef: parsed.data.mode === InternalChallengeMode.PERSONAL_INSTANCE ? parsed.data.instanceTemplateRef : null,
-                instanceCpuMilli: parsed.data.mode === InternalChallengeMode.PERSONAL_INSTANCE ? parsed.data.instanceCpuMilli : null,
-                instanceMemoryMb: parsed.data.mode === InternalChallengeMode.PERSONAL_INSTANCE ? parsed.data.instanceMemoryMb : null,
-                instanceLifetimeMinutes: parsed.data.mode === InternalChallengeMode.PERSONAL_INSTANCE ? parsed.data.instanceLifetimeMinutes : null,
+                protocol: null,
+                host: null,
+                port: null,
+                instanceTemplateRef: null,
+                instanceCpuMilli: null,
+                instanceMemoryMb: null,
+                instanceLifetimeMinutes: null,
                 hints: hints.length
                   ? { createMany: { data: hints.map((content, hintPosition) => ({ content, position: hintPosition })) } }
                   : undefined,

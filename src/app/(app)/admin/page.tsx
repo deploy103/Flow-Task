@@ -19,6 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { requireSystemAdministrator } from "@/features/auth/guards";
 import { prisma } from "@/lib/prisma";
 
 function startOfTodayInKorea(now = new Date()) {
@@ -60,6 +61,7 @@ function StatusPill({ healthy, children }: { healthy: boolean; children: React.R
 }
 
 export default async function SystemAdminDashboard() {
+  await requireSystemAdministrator();
   const today = startOfTodayInKorea();
   const [
     users,

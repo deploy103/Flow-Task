@@ -1,15 +1,9 @@
-import { Bell, Building2, Home, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/features/auth/actions";
 import { Button } from "@/components/ui/button";
+import { AppNavigation } from "./app-navigation";
 import { OrganizationSwitcher } from "./organization-switcher";
-
-const navigation = [
-  { href: "/dashboard", label: "홈", icon: Home },
-  { href: "/notifications", label: "알림", icon: Bell },
-  { href: "/organizations/new", label: "조직 만들기", icon: Building2 },
-  { href: "/profile", label: "내 정보", icon: UserRound },
-];
 
 export function AppShell({
   userName,
@@ -24,22 +18,16 @@ export function AppShell({
   isSystemAdmin: boolean;
   children: React.ReactNode;
 }) {
-  const visibleNavigation = isSystemAdmin
-    ? [...navigation, { href: "/admin", label: "시스템 관리", icon: ShieldCheck }]
-    : navigation;
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
+      <a className="sr-only fixed left-4 top-4 z-50 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white focus:not-sr-only" href="#main-content">본문 바로가기</a>
       <aside className="hidden border-r border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 lg:block">
         <Link href="/dashboard" className="text-lg font-black tracking-wide text-indigo-600">FLOW TASK</Link>
-        <nav className="mt-8 space-y-2">
-          {visibleNavigation.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
-              <Icon size={19} /> {label}{href === "/notifications" && unreadNotifications > 0 && <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{Math.min(unreadNotifications, 99)}</span>}
-            </Link>
-          ))}
+        <nav aria-label="주요 메뉴" className="mt-8 space-y-2">
+          <AppNavigation isSystemAdmin={isSystemAdmin} unreadNotifications={unreadNotifications} />
         </nav>
       </aside>
-      <div className="min-w-0 pb-20 lg:pb-0">
+      <div className="min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-8">
           <Link href="/dashboard" className="font-black tracking-wide text-indigo-600 lg:hidden">FLOW TASK</Link>
           <div className="ml-auto mr-3"><OrganizationSwitcher organizations={organizations} /></div>
@@ -50,14 +38,13 @@ export function AppShell({
             </Button>
           </form>
         </header>
-        <main className="mx-auto max-w-6xl p-4 sm:p-8">{children}</main>
+        <main className="mx-auto max-w-6xl p-4 sm:p-8" id="main-content" tabIndex={-1}>{children}</main>
+        <footer className="mx-auto max-w-6xl px-4 pb-24 text-right sm:px-8 lg:pb-8">
+          <Link href="/privacy" className="text-xs text-slate-500 underline underline-offset-4">개인정보처리방침</Link>
+        </footer>
       </div>
-      <nav className={`fixed inset-x-0 bottom-0 z-20 grid border-t border-slate-200 bg-white px-2 py-2 dark:border-slate-800 dark:bg-slate-950 lg:hidden ${isSystemAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
-        {visibleNavigation.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
-            <Icon size={19} /> {label}{href === "/notifications" && unreadNotifications > 0 && <span className="absolute ml-5 -mt-7 min-w-5 rounded-full bg-red-500 px-1 text-center text-[10px] text-white">{Math.min(unreadNotifications, 99)}</span>}
-          </Link>
-        ))}
+      <nav aria-label="주요 메뉴" className={`fixed inset-x-0 bottom-0 z-20 grid border-t border-slate-200 bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-950 lg:hidden ${isSystemAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
+        <AppNavigation isSystemAdmin={isSystemAdmin} mobile unreadNotifications={unreadNotifications} />
       </nav>
     </div>
   );

@@ -1,5 +1,6 @@
 import { AssignmentAudience, AssignmentFieldType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { ASSIGNMENT_SETUP_TYPE } from "@/constants/assignment";
 import {
   assignmentFieldTypesSchema,
   assignmentTargetIdsSchema,
@@ -8,6 +9,7 @@ import {
 
 const validInput = {
   organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4",
+  setupType: ASSIGNMENT_SETUP_TYPE.GENERAL_SUBMISSION,
   title: "1주차 활동 보고서",
   description: "활동 내용을 정리해 제출하세요.",
   audience: AssignmentAudience.ALL_MEMBERS,
@@ -61,6 +63,13 @@ describe("assignment schemas", () => {
         Array.from({ length: 501 }, () => "fd7736d1-ecc0-4c23-b12c-84077b66dca4"),
       ).success,
     ).toBe(false);
+  });
+
+  it("accepts supported setup types and rejects manipulated values", () => {
+    for (const setupType of Object.values(ASSIGNMENT_SETUP_TYPE)) {
+      expect(createAssignmentSchema.safeParse({ ...validInput, setupType }).success).toBe(true);
+    }
+    expect(createAssignmentSchema.safeParse({ ...validInput, setupType: "SERVER_CTF" }).success).toBe(false);
   });
 
   it("accepts zero to three unique supported submission fields", () => {
