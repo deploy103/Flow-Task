@@ -2,11 +2,13 @@ import { createOrganization } from "@/features/organization/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { BackLink } from "@/components/ui/back-link";
 
 export default async function NewOrganizationPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   return (
     <div className="max-w-2xl">
+      <BackLink href="/dashboard" label="대시보드" />
       <p className="text-sm font-semibold text-indigo-600">새로운 공간</p>
       <h1 className="mt-1 text-3xl font-bold">조직 만들기</h1>
       <p className="mt-2 text-slate-500">동아리, 학생회 또는 프로젝트팀을 위한 공간을 만드세요.</p>
