@@ -10,6 +10,8 @@ services:
       LOCAL_STORAGE_ROOT: /app/data/uploads
       SUBMISSION_CLEANUP_SECRET: ${SUBMISSION_CLEANUP_SECRET}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM}
       INVITATION_CODE_PEPPER: ${INVITATION_CODE_PEPPER}
       CHALLENGE_FLAG_PEPPER: ${CHALLENGE_FLAG_PEPPER}
       INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY}
@@ -20,8 +22,9 @@ services:
       WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT}
       INSTANCE_PROVIDER_URL: ${INSTANCE_PROVIDER_URL}
       INSTANCE_PROVIDER_TOKEN: ${INSTANCE_PROVIDER_TOKEN}
+      AUTH_TRUST_PROXY: ${AUTH_TRUST_PROXY:-false}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - local_storage:/app/data/uploads
     depends_on:
@@ -43,7 +46,7 @@ services:
       target: builder
       args:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-    command: ["npx", "prisma", "migrate", "deploy"]
+    command: ["sh", "-c", "node deploy/scripts/preflight-local-auth.mjs && npx prisma migrate deploy"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:

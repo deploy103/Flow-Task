@@ -18,12 +18,21 @@ export const MAX_QUIZ_FILE_BYTES = 512 * 1024;
 export const QUIZ_AUTOSAVE_DELAY_MILLISECONDS = 800;
 
 export const QUIZ_QUESTION_TYPE_LABELS = {
-  [QuizQuestionType.SINGLE_CHOICE]: "객관식 단일 선택",
-  [QuizQuestionType.MULTIPLE_CHOICE]: "객관식 복수 선택",
+  [QuizQuestionType.SINGLE_CHOICE]: "객관식 (정답 1개)",
+  [QuizQuestionType.MULTIPLE_CHOICE]: "체크박스 (정답 여러 개)",
   [QuizQuestionType.SHORT_TEXT]: "단답형",
   [QuizQuestionType.LONG_TEXT]: "서술형",
   [QuizQuestionType.FLAG]: "플래그 입력",
   [QuizQuestionType.FILE]: "파일 제출",
+} satisfies Record<QuizQuestionType, string>;
+
+export const QUIZ_QUESTION_TYPE_DESCRIPTIONS = {
+  [QuizQuestionType.SINGLE_CHOICE]: "여러 선택지 중 하나를 고릅니다. 정답 하나를 표시하세요.",
+  [QuizQuestionType.MULTIPLE_CHOICE]: "여러 선택지를 고를 수 있습니다. 정답을 하나 이상 표시하세요.",
+  [QuizQuestionType.SHORT_TEXT]: "짧은 답을 입력합니다. 인정할 정답 표현을 등록하세요.",
+  [QuizQuestionType.LONG_TEXT]: "긴 글로 답합니다. 관리자가 제출 후 직접 채점합니다.",
+  [QuizQuestionType.FLAG]: "CTF 플래그를 입력하고 서버가 자동으로 채점합니다.",
+  [QuizQuestionType.FILE]: "파일을 제출합니다. 관리자가 제출 후 직접 채점합니다.",
 } satisfies Record<QuizQuestionType, string>;
 
 export const QUIZ_RESULT_RELEASE_LABELS = {

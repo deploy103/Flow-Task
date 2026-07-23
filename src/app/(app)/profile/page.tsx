@@ -3,6 +3,7 @@ import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { calculateAge, formatDateOnly } from "@/features/auth/birth-date";
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
   const user = await requireAuthenticatedUser();
@@ -16,6 +17,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         <form action={updateProfile} className="space-y-4">
           <label className="block text-sm font-medium">이메일<Input value={user.email} disabled className="mt-2 opacity-70" /></label>
           <label className="block text-sm font-medium">이름<Input name="name" defaultValue={user.name} required minLength={2} maxLength={50} className="mt-2" /></label>
+          <label className="block text-sm font-medium">생년월일 <span className="text-slate-400">(기존 계정은 선택)</span><Input name="birthDate" type="date" defaultValue={user.birthDate ? formatDateOnly(user.birthDate) : ""} className="mt-2" />{user.birthDate && <span className="mt-1 block text-xs font-normal text-slate-500">현재 만 {calculateAge(user.birthDate)}세</span>}</label>
           <label className="block text-sm font-medium">학번<Input name="studentNumber" defaultValue={user.studentNumber ?? ""} maxLength={30} className="mt-2" /></label>
           <Button type="submit">변경사항 저장</Button>
         </form>

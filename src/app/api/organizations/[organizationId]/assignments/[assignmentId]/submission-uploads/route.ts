@@ -2,6 +2,7 @@ import { AssignmentFieldType, Prisma, SubmissionUploadStatus } from "@prisma/cli
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  MAX_SUBMISSION_UPLOAD_CANCELLATION_BODY_BYTES,
   SUBMISSION_UPLOAD_RATE_WINDOW_MINUTES,
   SUBMISSION_UPLOAD_RESERVED_BYTES,
 } from "@/constants/assignment";
@@ -19,6 +20,7 @@ import {
   hasBoundedSubmissionUploadRequestBody,
 } from "@/features/submission/upload-policy";
 import { prisma } from "@/lib/prisma";
+import { hasTrustedMutationOrigin, readBoundedJson } from "@/lib/request-security";
 
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const routeParamsSchema = z.object({ organizationId: z.uuid(), assignmentId: z.uuid() });
@@ -27,7 +29,7 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
 
-function hasBoundedJsonBody(request: Request) {
+function hasBoundedUploadBody(request: Request) {
   return hasBoundedSubmissionUploadRequestBody({
     contentType: request.headers.get("content-type"),
     contentLength: request.headers.get("content-length"),
@@ -68,7 +70,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ organizationId: string; assignmentId: string }> },
 ) {
-  if (!hasBoundedJsonBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
+  if (!hasTrustedMutationOrigin(request)) return jsonError("FORBIDDEN_ORIGIN", "요청 출처가 올바르지 않습니다.", 403);
+  if (!hasBoundedUploadBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
   const parsedParams = routeParamsSchema.safeParse(await params);
   if (!parsedParams.success) return jsonError("INVALID_PATH", "요청 경로가 올바르지 않습니다.", 400);
   const { organizationId, assignmentId } = parsedParams.data;
@@ -242,19 +245,15 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ organizationId: string; assignmentId: string }> },
 ) {
-  if (!hasBoundedJsonBody(request)) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
+  if (!hasTrustedMutationOrigin(request)) return jsonError("FORBIDDEN_ORIGIN", "요청 출처가 올바르지 않습니다.", 403);
   const parsedParams = routeParamsSchema.safeParse(await params);
   if (!parsedParams.success) return jsonError("INVALID_PATH", "요청 경로가 올바르지 않습니다.", 400);
   const { organizationId, assignmentId } = parsedParams.data;
   const context = await getUploadContext(organizationId, assignmentId);
   if ("error" in context) return context.error;
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
-  }
-  const parsed = cancelSubmissionUploadsSchema.safeParse(body);
+  const body = await readBoundedJson(request, MAX_SUBMISSION_UPLOAD_CANCELLATION_BODY_BYTES);
+  if (!body.success) return jsonError("INVALID_BODY", "요청 형식이 올바르지 않습니다.", 400);
+  const parsed = cancelSubmissionUploadsSchema.safeParse(body.data);
   if (!parsed.success) return jsonError("INVALID_UPLOADS", "업로드 정보가 올바르지 않습니다.", 400);
   const uploads = await prisma.submissionUpload.findMany({
     where: {

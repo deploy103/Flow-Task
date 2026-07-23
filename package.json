@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "overrides": {
+    "sharp": "0.35.3",
     "next": {
       "postcss": "8.5.10"
     }
@@ -14,6 +15,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:db": "RUN_DATABASE_TESTS=1 vitest run src/features/auth/rate-limit.integration.test.ts src/features/auth/email-auth.integration.test.ts",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
@@ -22,9 +24,11 @@
     "@prisma/client": "^6.12.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.525.0",
-    "next": "16.2.10",
+    "next": "16.2.11",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.1",
     "web-push": "^3.6.7",
     "zod": "^4.0.5"
@@ -36,7 +40,7 @@
     "@types/react-dom": "^19.2.2",
     "@types/web-push": "^3.6.4",
     "eslint": "^9.31.0",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.11",
     "prisma": "^6.12.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3",

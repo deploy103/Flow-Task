@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { confirmAnnouncement } from "@/features/announcement/actions";
+import { MarkdownContent } from "@/features/announcement/components/markdown-content";
 import { canViewAnnouncement } from "@/features/announcement/visibility";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization } from "@/features/organization/permissions";
@@ -62,7 +63,7 @@ export default async function AnnouncementDetailPage({
       <div className="flex flex-wrap items-center gap-2">{announcement.priority === "IMPORTANT" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600 dark:bg-red-950">중요</span>}<span className="text-sm text-slate-500">{announcement.audience === AnnouncementAudience.ALL_MEMBERS ? "전체 구성원" : "선택 공개"}</span></div>
       <h1 className="mt-3 text-3xl font-bold">{announcement.title}</h1><p className="mt-2 text-sm text-slate-500">{announcement.author.name} · {formatKoreanDateTime(announcement.publishedAt)}</p>
       {notice.message === "confirmed" && <p className="mt-5 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-200">공지 확인을 기록했습니다.</p>}
-      <Card className="mt-6"><div className="whitespace-pre-wrap leading-7">{announcement.content}</div></Card>
+      <Card className="mt-6"><MarkdownContent content={announcement.content} /></Card>
       <Card className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-bold">확인 상태</h2><p className="mt-1 text-sm text-slate-500">확인 버튼을 누르면 확인 시각이 기록됩니다.</p></div>{confirmedByCurrentUser ? <span className="inline-flex items-center gap-2 font-semibold text-green-600"><CheckCircle2 size={20} /> 확인 완료</span> : <form action={confirmAnnouncement}><input type="hidden" name="organizationId" value={organizationId} /><input type="hidden" name="announcementId" value={announcementId} /><Button type="submit">확인했습니다</Button></form>}</div>
       </Card>

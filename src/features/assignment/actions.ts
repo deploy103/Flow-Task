@@ -11,6 +11,7 @@ import {
   assignmentTargetIdsSchema,
   createAssignmentSchema,
 } from "./schemas";
+import { getAssignmentSetupPath } from "./setup";
 
 export async function createAssignment(formData: FormData) {
   const parsedOrganizationId = assignmentOrganizationIdSchema.safeParse(
@@ -103,5 +104,11 @@ export async function createAssignment(formData: FormData) {
     redirect(`/organizations/${parsed.data.organizationId}/assignments/new?error=create_failed`);
   }
 
-  redirect(`/organizations/${parsed.data.organizationId}/assignments/${assignmentId}`);
+  redirect(
+    getAssignmentSetupPath(
+      parsed.data.organizationId,
+      assignmentId,
+      parsed.data.setupType,
+    ),
+  );
 }

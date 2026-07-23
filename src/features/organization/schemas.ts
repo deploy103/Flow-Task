@@ -27,3 +27,10 @@ export const updateMemberRoleSchema = z.object({
   memberId: z.uuid(),
   role: z.enum([MembershipRole.MEMBER, MembershipRole.MENTOR, MembershipRole.ORG_ADMIN]),
 });
+
+export const organizationSettingsSchema = z.object({
+  organizationId: z.uuid(),
+  name: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(500).transform((value) => value || null),
+  removeLogo: z.literal("on").optional().transform(Boolean),
+});
