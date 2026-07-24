@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSystemAdministrator } from "@/features/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { canChangeSystemRole, canDeleteManagedUser, deletedUserEmail } from "./policy";
+import { canChangeSystemRole, canDeleteManagedUser, deletedUserEmail, requiresEmailSecurityReset } from "./policy";
 import {
   adminOrganizationDeleteSchema,
   adminOrganizationUpdateSchema,
@@ -28,6 +28,12 @@ export async function updateUserAsSystemAdmin(formData: FormData) {
       if (!canChangeSystemRole({ actorId: actor.id, targetId: target.id, currentRole: target.systemRole, nextRole: parsed.data.systemRole, administratorCount })) {
         throw new Error("ADMIN_SAFETY_POLICY");
       }
+      const emailChanged = requiresEmailSecurityReset(target.email, parsed.data.email);
+      if (emailChanged) {
+        await transaction.emailVerificationToken.deleteMany({ where: { userId: target.id } });
+        await transaction.passwordResetToken.deleteMany({ where: { userId: target.id } });
+        await transaction.authSession.deleteMany({ where: { userId: target.id } });
+      }
       await transaction.user.update({
         where: { id: target.id },
         data: {
@@ -36,6 +42,7 @@ export async function updateUserAsSystemAdmin(formData: FormData) {
           studentNumber: parsed.data.studentNumber,
           birthDate: parsed.data.birthDate,
           systemRole: parsed.data.systemRole,
+          ...(emailChanged ? { emailVerifiedAt: null } : {}),
         },
       });
       await transaction.auditLog.create({
@@ -44,7 +51,7 @@ export async function updateUserAsSystemAdmin(formData: FormData) {
           action: "SYSTEM_USER_UPDATED",
           targetType: "USER",
           targetId: target.id,
-          metadata: { emailChanged: target.email !== parsed.data.email, previousSystemRole: target.systemRole, systemRole: parsed.data.systemRole },
+          metadata: { emailChanged, previousSystemRole: target.systemRole, systemRole: parsed.data.systemRole },
         },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
