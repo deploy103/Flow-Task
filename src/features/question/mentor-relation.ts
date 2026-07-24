@@ -1,13 +1,16 @@
-import { MembershipRole, MembershipStatus } from "@prisma/client";
+import { MembershipStatus, MentoringRole, type SecurityTrack } from "@prisma/client";
 
 type RelationMember = {
-  role: MembershipRole;
+  mentoringRole: MentoringRole;
+  securityTrack: SecurityTrack | null;
   status: MembershipStatus;
 };
 
 export function canAssignMentorRelation(mentor: RelationMember | undefined, mentee: RelationMember | undefined) {
   return mentor?.status === MembershipStatus.ACTIVE
-    && mentor.role === MembershipRole.MENTOR
+    && mentor.mentoringRole === MentoringRole.MENTOR
     && mentee?.status === MembershipStatus.ACTIVE
-    && mentee.role === MembershipRole.MEMBER;
+    && mentee.mentoringRole === MentoringRole.MENTEE
+    && mentor.securityTrack !== null
+    && mentor.securityTrack === mentee.securityTrack;
 }

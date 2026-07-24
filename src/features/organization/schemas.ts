@@ -1,4 +1,4 @@
-import { MembershipRole } from "@prisma/client";
+import { ClubPosition, MembershipRole, MentoringRole, SecurityTrack } from "@prisma/client";
 import { z } from "zod";
 
 export const organizationSchema = z.object({
@@ -25,7 +25,9 @@ export const joinOrganizationSchema = z.object({
 export const updateMemberRoleSchema = z.object({
   organizationId: z.uuid(),
   memberId: z.uuid(),
-  role: z.enum([MembershipRole.MEMBER, MembershipRole.MENTOR, MembershipRole.ORG_ADMIN]),
+  position: z.enum(ClubPosition),
+  securityTrack: z.preprocess((value) => value === "" ? null : value, z.enum(SecurityTrack).nullable()),
+  mentoringRole: z.enum(MentoringRole),
 });
 
 export const organizationSettingsSchema = z.object({

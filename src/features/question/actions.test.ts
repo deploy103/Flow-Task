@@ -1,4 +1,4 @@
-import { MembershipRole, MembershipStatus, SystemRole } from "@prisma/client";
+import { MembershipStatus, MentoringRole, SecurityTrack, SystemRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -40,10 +40,10 @@ describe("assignMentorRelation", () => {
     });
   });
 
-  it.each([MembershipRole.MENTOR, MembershipRole.ORG_ADMIN])("rejects a manipulated %s mentee", async (menteeRole) => {
+  it.each([MentoringRole.MENTOR, MentoringRole.NONE])("rejects a manipulated %s mentee", async (menteeRole) => {
     mocks.findMany.mockResolvedValue([
-      { userId: mentorId, role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE },
-      { userId: menteeId, role: menteeRole, status: MembershipStatus.ACTIVE },
+      { userId: mentorId, mentoringRole: MentoringRole.MENTOR, securityTrack: SecurityTrack.PWNABLE, status: MembershipStatus.ACTIVE },
+      { userId: menteeId, mentoringRole: menteeRole, securityTrack: SecurityTrack.PWNABLE, status: MembershipStatus.ACTIVE },
     ]);
 
     await expect(assignMentorRelation(relationForm())).rejects.toThrow(`REDIRECT:/organizations/${organizationId}/questions/mentors?error=invalid_members`);

@@ -1,4 +1,4 @@
-import { MembershipRole, MembershipStatus, QuestionBoardType, QuestionStatus } from "@prisma/client";
+import { MembershipStatus, MentoringRole, QuestionBoardType, QuestionStatus } from "@prisma/client";
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export default async function QuestionPage({ params, searchParams }: { params: P
   const context = { userId: user.id, systemRole: user.systemRole, membership, authorId: question.authorId, assignedMentorId: question.assignedMentorId };
   const canManage = canManageOrganization({ systemRole: user.systemRole, membership });
   const canEdit = canEditQuestion(context);
-  const mentors = canManage && question.boardType === QuestionBoardType.MENTOR_QNA ? await prisma.organizationMember.findMany({ where: { organizationId, role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE }, include: { user: { select: { id: true, name: true } } }, orderBy: { user: { name: "asc" } } }) : [];
+  const mentors = canManage && question.boardType === QuestionBoardType.MENTOR_QNA ? await prisma.organizationMember.findMany({ where: { organizationId, mentoringRole: MentoringRole.MENTOR, status: MembershipStatus.ACTIVE }, include: { user: { select: { id: true, name: true } } }, orderBy: { user: { name: "asc" } } }) : [];
   const allowedStatuses = Object.values(QuestionStatus).filter((status) => canSetQuestionStatus(question.boardType, status, context));
   return <div className="max-w-4xl"><p className="text-sm font-semibold text-indigo-600">{question.boardType} · {question.category} · {question.status}</p><div className="mt-2 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-3xl font-bold">{question.title}</h1><p className="mt-2 text-sm text-slate-500">{question.author.name} · {formatKoreanDateTime(question.createdAt)}</p></div>{canEdit && <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white" href={`/organizations/${organizationId}/questions/${questionId}/edit`}><Pencil size={18} /> 수정·삭제</Link>}</div>
     {message === "updated" && <p className="mt-5 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-200">질문을 수정했습니다.</p>}
