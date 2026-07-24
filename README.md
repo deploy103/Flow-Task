@@ -42,7 +42,7 @@ npm run dev
 
 회원가입 이메일 인증과 비밀번호 재설정 메일을 보내려면 `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`와 인증된 발신 주소인 `AUTH_EMAIL_FROM`을 설정합니다. SMTP 인증이 필요한 환경에서만 `SMTP_USER`와 `SMTP_PASSWORD`를 함께 설정합니다. Compose 내부 Postfix는 외부 포트를 공개하지 않고 별도 메일 네트워크의 앱 연결만 허용합니다. 인증 링크는 `NEXT_PUBLIC_APP_URL`을 기준으로 생성하므로 운영 환경에서는 외부에서 접근 가능한 HTTPS 주소를 사용해야 합니다. 기존 계정은 마이그레이션 때 인증 완료 상태로 보존되고, 이후 가입한 계정은 24시간 유효한 일회용 링크를 확인하기 전까지 로그인할 수 없습니다. 비밀번호 재설정 링크는 30분 동안 한 번만 사용할 수 있으며 변경 후 기존 세션은 모두 폐기됩니다.
 
-자체 SMTP를 인터넷 발송에 사용하려면 `SMTP_HOSTNAME`과 `SMTP_ALLOWED_SENDER_DOMAINS`를 실제 발신 도메인으로 바꾸고, 서버 공인 IP의 PTR, SPF, DKIM, DMARC DNS를 설정해야 합니다. 첫 실행 후 `smtp_dkim` 볼륨에서 생성된 `flowtask` 공개키를 확인해 DNS에 등록하고 외부 수신처로 전달 여부를 점검합니다. 운영 호스팅 업체가 25번 포트 발신을 차단한 경우에는 해당 제한을 먼저 해제해야 하며, SMTP 포트를 공인 인터페이스에 게시하면 안 됩니다.
+자체 SMTP를 인터넷 발송에 사용하려면 `SMTP_HOSTNAME`과 `SMTP_ALLOWED_SENDER_DOMAINS`를 실제 발신 도메인으로 바꾸고, 서버 공인 IP의 PTR, SPF, DKIM, DMARC DNS를 설정해야 합니다. `MAIL_NETWORK_SUBNET`은 운영 서버의 기존 Docker 대역과 겹치지 않는 사설 CIDR로 지정하며 같은 값이 Postfix 허용 대역에도 적용됩니다. 첫 실행 후 `smtp_dkim` 볼륨에서 생성된 `flowtask` 공개키를 확인해 DNS에 등록하고 외부 수신처로 전달 여부를 점검합니다. 운영 호스팅 업체가 25번 포트 발신을 차단한 경우에는 해당 제한을 먼저 해제해야 하며, SMTP 포트를 공인 인터페이스에 게시하면 안 됩니다.
 
 파일은 정적 공개 경로 밖의 로컬 비공개 저장소에 무작위 경로로 저장합니다. 서버는 업로드 전 접근 권한·요청 크기·rate limit·quota·MIME·파일 시그니처를 검사하고, 제출 연결 전에 저장된 실제 크기와 시그니처를 다시 확인합니다. Docker Compose는 `local_storage` 영구 볼륨을 `/app/data/uploads`에 연결합니다.
 
