@@ -23,3 +23,7 @@ export function canDeleteManagedUser(actorId: string, target: { id: string; syst
 export function deletedUserEmail(userId: string) {
   return `deleted-${userId}@deleted.invalid`;
 }
+
+export function requiresEmailSecurityReset(currentEmail: string, nextEmail: string) {
+  return currentEmail.trim().toLowerCase() !== nextEmail.trim().toLowerCase();
+}
