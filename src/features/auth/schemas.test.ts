@@ -3,7 +3,8 @@ import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, si
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
-    expect(loginSchema.safeParse({ email: "student@example.com", password: "safe-password" }).success).toBe(true);
+    expect(loginSchema.parse({ email: "student@example.com", password: "safe-password" }).rememberMe).toBe(false);
+    expect(loginSchema.parse({ email: "student@example.com", password: "safe-password", rememberMe: "on" }).rememberMe).toBe(true);
   });
 
   it("rejects malformed email and short password", () => {
