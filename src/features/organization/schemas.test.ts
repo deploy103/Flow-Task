@@ -1,6 +1,6 @@
-import { MembershipRole } from "@prisma/client";
+import { ClubPosition, MembershipRole, MentoringRole, SecurityTrack } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { invitationSchema, joinOrganizationSchema, leaveOrganizationSchema, organizationSettingsSchema, removeOrganizationMemberSchema } from "./schemas";
+import { invitationSchema, joinOrganizationSchema, leaveOrganizationSchema, organizationSettingsSchema, removeOrganizationMemberSchema, updateMemberRoleSchema } from "./schemas";
 
 describe("organization schemas", () => {
   it("rejects issuing administrator invitations", () => {
@@ -54,5 +54,22 @@ describe("organization schemas", () => {
     expect(removeOrganizationMemberSchema.safeParse(input).success).toBe(true);
     expect(removeOrganizationMemberSchema.safeParse({ ...input, memberId: "invalid" }).success).toBe(false);
     expect(removeOrganizationMemberSchema.safeParse({ ...input, confirmationName: "" }).success).toBe(false);
+  });
+
+  it("validates independent club position, track, and mentoring role", () => {
+    expect(updateMemberRoleSchema.safeParse({
+      organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4",
+      memberId: "fd7736d1-ecc0-4c23-b12c-84077b66dca5",
+      position: ClubPosition.VICE_PRESIDENT,
+      securityTrack: SecurityTrack.CRYPTOGRAPHY,
+      mentoringRole: MentoringRole.MENTOR,
+    }).success).toBe(true);
+    expect(updateMemberRoleSchema.parse({
+      organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4",
+      memberId: "fd7736d1-ecc0-4c23-b12c-84077b66dca5",
+      position: ClubPosition.MEMBER,
+      securityTrack: "",
+      mentoringRole: MentoringRole.NONE,
+    }).securityTrack).toBeNull();
   });
 });
