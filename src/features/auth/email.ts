@@ -1,3 +1,4 @@
+import { createTransport } from "nodemailer";
 import { getAuthEmailEnvironment } from "@/lib/env";
 
 function escapeHtml(value: string) {
@@ -12,17 +13,31 @@ function escapeHtml(value: string) {
 
 async function sendAuthEmail(to: string, subject: string, text: string, html: string) {
   const environment = getAuthEmailEnvironment();
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${environment.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from: environment.AUTH_EMAIL_FROM, to: [to], subject, text, html }),
-    signal: AbortSignal.timeout(10_000),
+  const transport = createTransport({
+    host: environment.SMTP_HOST,
+    port: environment.SMTP_PORT,
+    secure: environment.SMTP_SECURE,
+    auth: environment.SMTP_USER ? { user: environment.SMTP_USER, pass: environment.SMTP_PASSWORD } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
-  if (!response.ok) throw new Error(`AUTH_EMAIL_DELIVERY_FAILED_${response.status}`);
+  await transport.sendMail({ from: environment.AUTH_EMAIL_FROM, to, subject, text, html });
 }
+
+/*
+ * 비활성화한 외부 Resend 구현. 자체 SMTP 운영이 불가능해질 때 참고하기 위해 남긴다.
+ *
+ * const response = await fetch("https://api.resend.com/emails", {
+ *   method: "POST",
+ *   headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+ *   body: JSON.stringify({ from, to: [to], subject, text, html }),
+ *   signal: AbortSignal.timeout(10_000),
+ * });
+ * if (!response.ok) throw new Error(`AUTH_EMAIL_DELIVERY_FAILED_${response.status}`);
+ */
 
 export async function sendVerificationEmail(to: string, name: string, verificationLink: string) {
   const safeName = escapeHtml(name);
