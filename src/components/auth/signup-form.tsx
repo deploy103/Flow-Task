@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { signUp, type AuthFormState } from "@/features/auth/actions";
 import { AuthNotice } from "@/components/auth/auth-notice";
+import { BirthDateField } from "@/components/auth/birth-date-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRIVACY_POLICY_VERSION } from "@/constants/privacy";
@@ -21,7 +22,7 @@ export function SignupForm() {
       <AuthNotice error={state.error} />
       <form action={formAction} className="mt-6 space-y-4">
         <label className="block text-sm font-medium">이름<Input name="name" required minLength={2} maxLength={50} autoComplete="name" className="mt-2" value={values.name} onChange={(event) => update("name", event.target.value)} /></label>
-        <label className="block text-sm font-medium">생년월일<Input name="birthDate" type="date" required autoComplete="bday" className="mt-2" value={values.birthDate} onChange={(event) => update("birthDate", event.target.value)} /><span className="mt-1 block text-xs font-normal text-slate-500">나이는 생년월일을 기준으로 자동 계산됩니다.</span></label>
+        <BirthDateField onChange={(value) => update("birthDate", value)} />
         <label className="block text-sm font-medium">학번 <span className="text-slate-400">(선택)</span><Input name="studentNumber" maxLength={30} className="mt-2" value={values.studentNumber} onChange={(event) => update("studentNumber", event.target.value)} /></label>
         <label className="block text-sm font-medium">이메일<Input name="email" type="email" required autoComplete="email" className="mt-2" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
         <label className="block text-sm font-medium">비밀번호<Input name="password" type="password" required minLength={8} maxLength={128} autoComplete="new-password" className="mt-2" value={values.password} onChange={(event) => update("password", event.target.value)} /></label>
