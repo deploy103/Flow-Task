@@ -11,7 +11,7 @@ import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, si
 import { requireAuthenticatedUser } from "./guards";
 import { hashPassword, verifyPassword } from "./password";
 import { createUserSession, revokeCurrentSession } from "./session";
-import { consumeAuthAttempt } from "./rate-limit";
+import { consumeAuthAttempt, consumeEmailDeliveryCooldown } from "./rate-limit";
 import { buildAuthLink } from "./token";
 import { consumeEmailVerificationToken, issueEmailVerificationToken } from "./email-verification";
 import { issuePasswordResetToken, resetPasswordWithToken } from "./password-reset";
@@ -75,6 +75,9 @@ export async function signUp(_previousState: AuthFormState, formData: FormData):
     }
     return { error: "signup_failed" };
   }
+  if (!(await consumeEmailDeliveryCooldown("VERIFY", email))) {
+    redirect(`/verify-email?error=email_cooldown&email=${encodeURIComponent(email)}`);
+  }
   try {
     const token = await issueEmailVerificationToken(id);
     const { NEXT_PUBLIC_APP_URL } = getAuthEmailEnvironment();
@@ -90,6 +93,9 @@ export async function resendVerificationEmail(formData: FormData) {
   if (!parsed.success) redirect("/verify-email?error=invalid_input");
   const email = parsed.data.email.toLowerCase();
   if (!(await consumeAuthAttempt("VERIFY", email))) redirect("/verify-email?error=rate_limited");
+  if (!(await consumeEmailDeliveryCooldown("VERIFY", email))) {
+    redirect(`/verify-email?error=email_cooldown&email=${encodeURIComponent(email)}`);
+  }
 
   after(async () => {
     try {
@@ -119,6 +125,9 @@ export async function requestPasswordReset(formData: FormData) {
   if (!parsed.success) redirect("/forgot-password?error=invalid_input");
   const email = parsed.data.email.toLowerCase();
   if (!(await consumeAuthAttempt("RESET", email))) redirect("/forgot-password?error=rate_limited");
+  if (!(await consumeEmailDeliveryCooldown("RESET", email))) {
+    redirect("/forgot-password?error=email_cooldown");
+  }
 
   after(async () => {
     try {

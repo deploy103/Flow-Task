@@ -3,6 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
   consumeAuthAttemptsForContext,
+  consumeEmailDeliveryCooldownForContext,
+  EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
+  getEmailDeliveryCooldownCounter,
   getAuthRateLimitCounters,
   getAuthRateLimitKeyHash,
   type AuthRateLimitAction,
@@ -22,6 +25,12 @@ describeWithDatabase("auth rate limit database concurrency", () => {
   async function consume(action: AuthRateLimitAction, identity: string, sourceKey: string) {
     trackCounters(action, identity, sourceKey);
     return consumeAuthAttemptsForContext(action, identity, sourceKey);
+  }
+
+  async function consumeEmail(identity: string, now: Date) {
+    const counter = getEmailDeliveryCooldownCounter("VERIFY", identity);
+    trackedKeyHashes.add(getAuthRateLimitKeyHash(counter.clientKey));
+    return consumeEmailDeliveryCooldownForContext("VERIFY", identity, now);
   }
 
   beforeAll(async () => {
@@ -57,6 +66,16 @@ describeWithDatabase("auth rate limit database concurrency", () => {
     );
 
     expect(results.filter(Boolean)).toHaveLength(10);
+  });
+
+  it("allows one email per five minutes even under concurrency", async () => {
+    const identity = `mail-${randomUUID()}@example.com`;
+    const now = new Date("2026-07-24T00:00:00.000Z");
+    const results = await Promise.all(Array.from({ length: 20 }, () => consumeEmail(identity, now)));
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    await expect(consumeEmail(identity, new Date(now.getTime() + EMAIL_DELIVERY_COOLDOWN_MILLISECONDS - 1))).resolves.toBe(false);
+    await expect(consumeEmail(identity, new Date(now.getTime() + EMAIL_DELIVERY_COOLDOWN_MILLISECONDS))).resolves.toBe(true);
   });
 
   it("limits consecutive unique accounts from one source", async () => {

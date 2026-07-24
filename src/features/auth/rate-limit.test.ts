@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
+  getEmailDeliveryCooldownCounter,
   getAuthRateLimitCounters,
   resolveAuthRateLimitSourceKey,
 } from "./rate-limit";
@@ -44,5 +46,18 @@ describe("auth rate limit keys", () => {
     expect(counters.account.clientKey).toBe("account:user@example.com");
     expect(counters.global.clientKey).toBe("global:all-clients");
     expect(new Set(Object.values(counters).map(({ action }) => action))).toHaveLength(3);
+  });
+
+  it("uses a normalized purpose-specific five-minute email counter", () => {
+    const verification = getEmailDeliveryCooldownCounter("VERIFY", " User@Example.com ");
+    const reset = getEmailDeliveryCooldownCounter("RESET", " User@Example.com ");
+
+    expect(verification).toMatchObject({
+      action: "EMAIL_VERIFY_COOLDOWN",
+      clientKey: "account:user@example.com",
+      attempts: 1,
+      windowMilliseconds: EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
+    });
+    expect(reset.action).toBe("EMAIL_RESET_COOLDOWN");
   });
 });
