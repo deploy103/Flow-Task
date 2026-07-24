@@ -18,10 +18,12 @@ import { issuePasswordResetToken, resetPasswordWithToken } from "./password-rese
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 import { PRIVACY_POLICY_VERSION } from "@/constants/privacy";
 
-export async function login(formData: FormData) {
+export type AuthFormState = { error?: string };
+
+export async function login(_previousState: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/login?error=invalid_input");
-  if (!(await consumeAuthAttempt("LOGIN", parsed.data.email))) redirect("/login?error=rate_limited");
+  if (!parsed.success) return { error: "invalid_input" };
+  if (!(await consumeAuthAttempt("LOGIN", parsed.data.email))) return { error: "rate_limited" };
 
   const email = parsed.data.email.toLowerCase();
   const user = await prisma.user.findUnique({
@@ -30,10 +32,10 @@ export async function login(formData: FormData) {
   });
   if (!user?.credential) {
     await hashPassword(parsed.data.password);
-    redirect("/login?error=invalid_credentials");
+    return { error: "invalid_credentials" };
   }
   if (!(await verifyPassword(parsed.data.password, user.credential.passwordHash))) {
-    redirect("/login?error=invalid_credentials");
+    return { error: "invalid_credentials" };
   }
   if (!user.emailVerifiedAt) {
     redirect(`/verify-email?error=email_not_verified&email=${encodeURIComponent(email)}`);
@@ -43,10 +45,10 @@ export async function login(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function signUp(formData: FormData) {
+export async function signUp(_previousState: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/signup?error=invalid_input");
-  if (!(await consumeAuthAttempt("SIGNUP", parsed.data.email))) redirect("/signup?error=rate_limited");
+  if (!parsed.success) return { error: "invalid_input" };
+  if (!(await consumeAuthAttempt("SIGNUP", parsed.data.email))) return { error: "rate_limited" };
 
   const id = randomUUID();
   const email = parsed.data.email.toLowerCase();
@@ -69,9 +71,9 @@ export async function signUp(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      redirect("/signup?error=email_in_use");
+      return { error: "email_in_use" };
     }
-    redirect("/signup?error=signup_failed");
+    return { error: "signup_failed" };
   }
   try {
     const token = await issueEmailVerificationToken(id);
