@@ -40,7 +40,7 @@ export async function login(_previousState: AuthFormState, formData: FormData): 
   if (!user.emailVerifiedAt) {
     redirect(`/verify-email?error=email_not_verified&email=${encodeURIComponent(email)}`);
   }
-  await createUserSession(user.id);
+  await createUserSession(user.id, parsed.data.rememberMe);
 
   redirect("/dashboard");
 }
