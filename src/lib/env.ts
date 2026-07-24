@@ -7,9 +7,15 @@ const serverEnvironmentSchema = z.object({
 });
 
 const authEmailEnvironmentSchema = z.object({
-  RESEND_API_KEY: z.string().min(20),
-  AUTH_EMAIL_FROM: z.string().min(3).max(320),
+  SMTP_HOST: z.string().min(1).max(253).regex(/^[A-Za-z0-9.-]+$/),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  AUTH_EMAIL_FROM: z.string().min(3).max(320).refine((value) => !/[\r\n]/.test(value), "Invalid mail header."),
   NEXT_PUBLIC_APP_URL: z.url(),
+}).refine((value) => Boolean(value.SMTP_USER) === Boolean(value.SMTP_PASSWORD), {
+  message: "SMTP_USER and SMTP_PASSWORD must be configured together.",
 });
 
 const storageEnvironmentSchema = z.object({
