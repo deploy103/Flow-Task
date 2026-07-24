@@ -47,7 +47,7 @@ type AuthRateLimitCounter = {
 
 export function getEmailDeliveryCooldownCounter(purpose: EmailDeliveryPurpose, identity: string) {
   return {
-    action: `EMAIL_${purpose}_COOLDOWN`,
+    action: `MAIL_${purpose}_5M`,
     clientKey: `account:${identity.trim().toLowerCase()}`,
     attempts: 1,
     windowMilliseconds: EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
