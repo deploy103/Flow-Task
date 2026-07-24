@@ -22,6 +22,7 @@ const optionalBirthDateSchema = z.union([
 export const loginSchema = z.object({
   email: z.string().trim().email("올바른 이메일을 입력해 주세요."),
   password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다.").max(128),
+  rememberMe: z.literal("on").optional().transform((value) => value === "on"),
 });
 
 export const emailRequestSchema = z.object({
