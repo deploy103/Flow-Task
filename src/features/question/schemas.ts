@@ -9,4 +9,5 @@ export const answerSchema = questionReferenceSchema.extend({ content: z.string()
 export const statusSchema = questionReferenceSchema.extend({ status: z.enum(QuestionStatus) });
 export const acceptAnswerSchema = questionReferenceSchema.extend({ answerId: z.uuid() });
 export const mentorRelationSchema = z.object({ organizationId: z.uuid(), mentorId: z.uuid(), menteeId: z.uuid(), type: z.enum(MentorRelationType) }).refine((data) => data.mentorId !== data.menteeId);
+export const mentorRelationReferenceSchema = z.object({ organizationId: z.uuid(), relationId: z.uuid() });
 export const assignQuestionMentorSchema = questionReferenceSchema.extend({ mentorId: z.uuid() });
