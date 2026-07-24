@@ -53,11 +53,13 @@ describe("auth rate limit keys", () => {
     const reset = getEmailDeliveryCooldownCounter("RESET", " User@Example.com ");
 
     expect(verification).toMatchObject({
-      action: "EMAIL_VERIFY_COOLDOWN",
+      action: "MAIL_VERIFY_5M",
       clientKey: "account:user@example.com",
       attempts: 1,
       windowMilliseconds: EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
     });
-    expect(reset.action).toBe("EMAIL_RESET_COOLDOWN");
+    expect(reset.action).toBe("MAIL_RESET_5M");
+    expect(verification.action.length).toBeLessThanOrEqual(20);
+    expect(reset.action.length).toBeLessThanOrEqual(20);
   });
 });
