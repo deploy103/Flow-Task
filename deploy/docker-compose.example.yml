@@ -10,7 +10,9 @@ services:
       LOCAL_STORAGE_ROOT: /app/data/uploads
       SUBMISSION_CLEANUP_SECRET: ${SUBMISSION_CLEANUP_SECRET}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-      RESEND_API_KEY: ${RESEND_API_KEY}
+      SMTP_HOST: ${SMTP_HOST:-smtp}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
       AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM}
       INVITATION_CODE_PEPPER: ${INVITATION_CODE_PEPPER}
       CHALLENGE_FLAG_PEPPER: ${CHALLENGE_FLAG_PEPPER}
@@ -30,6 +32,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      smtp:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -38,6 +42,25 @@ services:
     restart: unless-stopped
     networks:
       - app_network
+      - mail_network
+
+  smtp:
+    image: boky/postfix:v5.1.0-alpine
+    hostname: ${SMTP_HOSTNAME:-mail.example.com}
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${SMTP_ALLOWED_SENDER_DOMAINS:-mail.example.com}
+      POSTFIX_myhostname: ${SMTP_HOSTNAME:-mail.example.com}
+      POSTFIX_mynetworks: 127.0.0.0/8,172.30.42.0/24
+      DKIM_AUTOGENERATE: "1"
+      DKIM_SELECTOR: flowtask
+    expose:
+      - "587"
+    volumes:
+      - smtp_spool:/var/spool/postfix
+      - smtp_dkim:/etc/opendkim/keys
+    restart: unless-stopped
+    networks:
+      - mail_network
 
   migrate:
     build:
@@ -78,7 +101,14 @@ services:
 volumes:
   postgres_data:
   local_storage:
+  smtp_spool:
+  smtp_dkim:
 
 networks:
   app_network:
     driver: bridge
+  mail_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
