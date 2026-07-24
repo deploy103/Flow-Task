@@ -50,7 +50,7 @@ services:
     environment:
       ALLOWED_SENDER_DOMAINS: ${SMTP_ALLOWED_SENDER_DOMAINS:-mail.example.com}
       POSTFIX_myhostname: ${SMTP_HOSTNAME:-mail.example.com}
-      POSTFIX_mynetworks: 127.0.0.0/8,172.30.42.0/24
+      POSTFIX_mynetworks: 127.0.0.0/8,${MAIL_NETWORK_SUBNET:-172.30.42.0/24}
       DKIM_AUTOGENERATE: "1"
       DKIM_SELECTOR: flowtask
     expose:
@@ -111,4 +111,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.42.0/24
+        - subnet: ${MAIL_NETWORK_SUBNET:-172.30.42.0/24}
