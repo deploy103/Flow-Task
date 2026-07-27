@@ -35,6 +35,10 @@ export function canModerateQuestion(boardType: QuestionBoardType, context: Conte
   return boardType === QuestionBoardType.PRIVATE_MENTOR && context.assignedMentorId === context.userId;
 }
 
+export function canEditQuestion(context: Context) {
+  return admin(context) || (active(context) && context.authorId === context.userId);
+}
+
 export function canSetQuestionStatus(boardType: QuestionBoardType, status: QuestionStatus, context: Context) {
   if (admin(context)) return true;
   if (context.authorId === context.userId) return status === QuestionStatus.WAITING || status === QuestionStatus.RESOLVED || status === QuestionStatus.CLOSED;
