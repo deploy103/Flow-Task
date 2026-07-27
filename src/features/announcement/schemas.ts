@@ -19,4 +19,8 @@ export const announcementReferenceSchema = z.object({
   announcementId: z.uuid(),
 });
 
+export const updateAnnouncementSchema = createAnnouncementSchema.extend({
+  announcementId: z.uuid(),
+});
+
 export const recipientIdsSchema = z.array(z.uuid()).max(MAX_ANNOUNCEMENT_RECIPIENT_COUNT);

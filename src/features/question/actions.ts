@@ -6,10 +6,10 @@ import { redirect } from "next/navigation";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization } from "@/features/organization/permissions";
 import { prisma } from "@/lib/prisma";
-import { canAnswerQuestion, canCreateQuestion, canSetQuestionStatus } from "./policy";
+import { canAnswerQuestion, canCreateQuestion, canEditQuestion, canSetQuestionStatus } from "./policy";
 import { canAssignMentorRelation } from "./mentor-relation";
 import { requireQuestionAccess } from "./queries";
-import { acceptAnswerSchema, answerSchema, assignQuestionMentorSchema, createQuestionSchema, mentorRelationSchema, statusSchema } from "./schemas";
+import { acceptAnswerSchema, answerSchema, assignQuestionMentorSchema, createQuestionSchema, deleteQuestionSchema, mentorRelationSchema, statusSchema, updateQuestionSchema } from "./schemas";
 import { questionStoragePath, removeQuestionAttachment, uploadQuestionAttachment, validateQuestionAttachment } from "./storage";
 
 const path = (organizationId: string, questionId?: string) => `/organizations/${organizationId}/questions${questionId ? `/${questionId}` : ""}`;
@@ -65,6 +65,66 @@ export async function createQuestionAnswer(formData: FormData) {
     return created;
   }); } catch { if (storagePath) await removeQuestionAttachment(storagePath).catch(() => undefined); redirect(`${path(parsed.data.organizationId, question.id)}?error=answer_failed`); }
   redirect(`${path(parsed.data.organizationId, question.id)}#answer-${answer.id}`);
+}
+
+export async function updateQuestion(formData: FormData) {
+  const parsed = updateQuestionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_question");
+  const { user, membership, question } = await requireQuestionAccess(parsed.data.organizationId, parsed.data.questionId);
+  const context = { userId: user.id, systemRole: user.systemRole, membership, authorId: question.authorId };
+  if (!canEditQuestion(context)) redirect(`${path(parsed.data.organizationId, question.id)}?error=forbidden`);
+  if (parsed.data.relatedAssignmentId) {
+    const canManage = canManageOrganization({ systemRole: user.systemRole, membership });
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        id: parsed.data.relatedAssignmentId,
+        organizationId: parsed.data.organizationId,
+        archivedAt: null,
+        ...(canManage ? {} : { opensAt: { lte: new Date() }, OR: [{ audience: "ALL_MEMBERS" }, { targets: { some: { userId: user.id } } }] }),
+      },
+      select: { id: true },
+    });
+    if (!assignment) redirect(`${path(parsed.data.organizationId, question.id)}/edit?error=invalid_assignment`);
+  }
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.question.updateMany({
+      where: { id: question.id, organizationId: parsed.data.organizationId, hiddenAt: null },
+      data: {
+        category: parsed.data.category,
+        title: parsed.data.title,
+        content: parsed.data.content,
+        attempted: parsed.data.attempted || null,
+        errorMessage: parsed.data.errorMessage || null,
+        code: parsed.data.code || null,
+        relatedAssignmentId: parsed.data.relatedAssignmentId || null,
+      },
+    });
+    if (result.count !== 1) return false;
+    await tx.auditLog.create({ data: { actorId: user.id, organizationId: parsed.data.organizationId, action: "QUESTION_UPDATED", targetType: "QUESTION", targetId: question.id } });
+    return true;
+  });
+  if (!updated) redirect(`${path(parsed.data.organizationId)}?error=not_found`);
+  redirect(`${path(parsed.data.organizationId, question.id)}?message=updated`);
+}
+
+export async function deleteQuestion(formData: FormData) {
+  const parsed = deleteQuestionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_question");
+  const { user, membership, question } = await requireQuestionAccess(parsed.data.organizationId, parsed.data.questionId);
+  const context = { userId: user.id, systemRole: user.systemRole, membership, authorId: question.authorId };
+  if (!canEditQuestion(context)) redirect(`${path(parsed.data.organizationId, question.id)}?error=forbidden`);
+  if (parsed.data.confirmationTitle !== question.title) redirect(`${path(parsed.data.organizationId, question.id)}/edit?error=confirmation_mismatch`);
+  const hidden = await prisma.$transaction(async (tx) => {
+    const result = await tx.question.updateMany({
+      where: { id: question.id, organizationId: parsed.data.organizationId, hiddenAt: null },
+      data: { hiddenAt: new Date(), closedAt: new Date(), status: QuestionStatus.CLOSED },
+    });
+    if (result.count !== 1) return false;
+    await tx.auditLog.create({ data: { actorId: user.id, organizationId: parsed.data.organizationId, action: "QUESTION_HIDDEN", targetType: "QUESTION", targetId: question.id } });
+    return true;
+  });
+  if (!hidden) redirect(`${path(parsed.data.organizationId)}?error=not_found`);
+  redirect(`${path(parsed.data.organizationId)}?message=deleted`);
 }
 
 export async function changeQuestionStatus(formData: FormData) {

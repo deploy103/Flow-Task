@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 import { MAX_ANNOUNCEMENT_CONTENT_LENGTH } from "@/constants/announcement";
 import { MarkdownContent } from "./markdown-content";
 
-export function MarkdownEditor() {
-  const [content, setContent] = useState("");
+export function MarkdownEditor({ initialContent = "" }: { initialContent?: string }) {
+  const [content, setContent] = useState(initialContent);
   const [preview, setPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
