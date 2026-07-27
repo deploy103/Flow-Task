@@ -22,6 +22,7 @@ const optionalBirthDateSchema = z.union([
 export const loginSchema = z.object({
   email: z.string().trim().email("올바른 이메일을 입력해 주세요."),
   password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다.").max(128),
+  rememberMe: z.literal("on").optional().transform((value) => value === "on"),
 });
 
 export const emailRequestSchema = z.object({
@@ -68,4 +69,16 @@ export const profileSchema = z.object({
     .regex(/^[0-9A-Za-z-]*$/)
     .optional()
     .transform((value) => value || undefined),
+});
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(8).max(128),
+  newPassword: z.string().min(8).max(128),
+  newPasswordConfirmation: z.string().min(8).max(128),
+}).refine((value) => value.newPassword === value.newPasswordConfirmation, {
+  message: "새 비밀번호가 일치하지 않습니다.",
+  path: ["newPasswordConfirmation"],
+}).refine((value) => value.currentPassword !== value.newPassword, {
+  message: "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+  path: ["newPassword"],
 });

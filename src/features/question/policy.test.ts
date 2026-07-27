@@ -1,6 +1,6 @@
 import { MembershipRole, MembershipStatus, QuestionBoardType, SystemRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { canAnswerQuestion, canModerateQuestion, canSetQuestionStatus, canViewQuestion } from "./policy";
+import { canAnswerQuestion, canEditQuestion, canModerateQuestion, canSetQuestionStatus, canViewQuestion } from "./policy";
 
 const member = { userId: "member", systemRole: SystemRole.USER, membership: { role: MembershipRole.MEMBER, status: MembershipStatus.ACTIVE } };
 const mentor = { userId: "mentor", systemRole: SystemRole.USER, membership: { role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE } };
@@ -21,5 +21,11 @@ describe("question access policy", () => {
     expect(canSetQuestionStatus(QuestionBoardType.MENTOR_QNA, "NEEDS_INFO", { ...member, authorId: "member" })).toBe(false);
     expect(canSetQuestionStatus(QuestionBoardType.MENTOR_QNA, "RESOLVED", { ...member, authorId: "member" })).toBe(true);
     expect(canSetQuestionStatus(QuestionBoardType.MENTOR_QNA, "NEEDS_INFO", { ...mentor, authorId: "member" })).toBe(true);
+  });
+  it("limits edits and deletion to the author or an organization administrator", () => {
+    expect(canEditQuestion({ ...member, authorId: "member" })).toBe(true);
+    expect(canEditQuestion({ ...mentor, authorId: "member" })).toBe(false);
+    expect(canEditQuestion({ ...member, membership: { ...member.membership, status: MembershipStatus.INACTIVE }, authorId: "member" })).toBe(false);
+    expect(canEditQuestion({ ...member, userId: "admin", membership: { role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE }, authorId: "member" })).toBe(true);
   });
 });

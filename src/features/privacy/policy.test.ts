@@ -16,8 +16,9 @@ describe("privacy policy disclosures", () => {
     (item) => expect(policyText).toContain(item),
   );
 
-  it("discloses the child policy and email processor", () => {
+  it("discloses the child policy and self-hosted email processing", () => {
     expect(policyText).toContain(`만 ${MINIMUM_SIGNUP_AGE}세`);
-    expect(policyText).toContain("Resend");
+    expect(policyText).toContain("서버가 운영하는 SMTP");
+    expect(policyText).not.toContain("Resend");
   });
 });
