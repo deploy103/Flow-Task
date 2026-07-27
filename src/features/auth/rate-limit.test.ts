@@ -48,6 +48,18 @@ describe("auth rate limit keys", () => {
     expect(new Set(Object.values(counters).map(({ action }) => action))).toHaveLength(3);
   });
 
+  it("limits authenticated password verification attempts separately", () => {
+    const counters = getAuthRateLimitCounters(
+      "PASSWORD",
+      " User@Example.com ",
+      "source:203.0.113.11",
+    );
+
+    expect(counters.account).toMatchObject({ action: "PASSWORD_ACCOUNT", attempts: 5 });
+    expect(counters.ip).toMatchObject({ action: "PASSWORD_IP", attempts: 10 });
+    expect(counters.global.action).toBe("PASSWORD_GLOBAL");
+  });
+
   it("uses a normalized purpose-specific five-minute email counter", () => {
     const verification = getEmailDeliveryCooldownCounter("VERIFY", " User@Example.com ");
     const reset = getEmailDeliveryCooldownCounter("RESET", " User@Example.com ");
