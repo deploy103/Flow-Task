@@ -1,6 +1,6 @@
 "use server";
 
-import { MembershipRole, MembershipStatus, Prisma } from "@prisma/client";
+import { MembershipRole, MembershipStatus, Prisma, QuestionStatus, SystemRole } from "@prisma/client";
 import { addDays } from "./date";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -14,6 +14,7 @@ import {
   leaveOrganizationSchema,
   organizationSchema,
   organizationSettingsSchema,
+  removeOrganizationMemberSchema,
   updateMemberRoleSchema,
 } from "./schemas";
 import { canLeaveOrganization } from "./permissions";
@@ -240,6 +241,92 @@ export async function updateMemberRole(formData: FormData) {
 
   revalidatePath(`/organizations/${parsed.data.organizationId}/members`);
   redirect(`/organizations/${parsed.data.organizationId}/members?message=role_updated`);
+}
+
+export async function removeOrganizationMember(formData: FormData) {
+  const parsed = removeOrganizationMemberSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  const membersPath = `/organizations/${parsed.data.organizationId}/members`;
+  if (parsed.data.memberId === user.id) redirect(`${membersPath}?error=self_removal`);
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const [actor, actorMembership] = await Promise.all([
+        transaction.user.findUnique({ where: { id: user.id }, select: { systemRole: true } }),
+        transaction.organizationMember.findUnique({
+          where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: user.id } },
+          select: { role: true, status: true },
+        }),
+      ]);
+      const hasCurrentManagementAccess = actor?.systemRole === SystemRole.SYSTEM_ADMIN || (
+        actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN
+      );
+      if (!hasCurrentManagementAccess) throw new Error("FORBIDDEN");
+
+      const target = await transaction.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: parsed.data.memberId } },
+        include: {
+          organization: { select: { archivedAt: true } },
+          user: { select: { name: true } },
+        },
+      });
+      if (!target || target.status !== MembershipStatus.ACTIVE || target.organization.archivedAt) {
+        throw new Error("MEMBER_NOT_FOUND");
+      }
+      if (target.user.name !== parsed.data.confirmationName) throw new Error("CONFIRMATION_MISMATCH");
+      if (target.role === MembershipRole.ORG_ADMIN) {
+        const activeAdministratorCount = await transaction.organizationMember.count({
+          where: { organizationId: parsed.data.organizationId, role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE },
+        });
+        if (activeAdministratorCount <= 1) throw new Error("LAST_ADMIN");
+      }
+
+      const now = new Date();
+      await transaction.departmentMember.deleteMany({
+        where: { userId: target.userId, department: { organizationId: parsed.data.organizationId } },
+      });
+      await transaction.mentorRelation.updateMany({
+        where: { organizationId: parsed.data.organizationId, endedAt: null, OR: [{ mentorId: target.userId }, { menteeId: target.userId }] },
+        data: { endedAt: now },
+      });
+      await transaction.question.updateMany({
+        where: { organizationId: parsed.data.organizationId, assignedMentorId: target.userId, status: QuestionStatus.IN_PROGRESS },
+        data: { assignedMentorId: null, status: QuestionStatus.WAITING },
+      });
+      await transaction.question.updateMany({
+        where: { organizationId: parsed.data.organizationId, assignedMentorId: target.userId },
+        data: { assignedMentorId: null },
+      });
+      await transaction.organizationInvite.updateMany({
+        where: { organizationId: parsed.data.organizationId, createdById: target.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      await transaction.organizationMember.update({
+        where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: target.userId } },
+        data: { status: MembershipStatus.INACTIVE },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorId: user.id,
+          organizationId: parsed.data.organizationId,
+          action: "ORGANIZATION_MEMBER_REMOVED",
+          targetType: "ORGANIZATION_MEMBER",
+          targetId: target.userId,
+          metadata: { previousRole: target.role },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "";
+    if (reason === "LAST_ADMIN") redirect(`${membersPath}?error=last_admin`);
+    if (reason === "CONFIRMATION_MISMATCH") redirect(`${membersPath}?error=confirmation_mismatch`);
+    redirect(`${membersPath}?error=remove_failed`);
+  }
+
+  revalidatePath(membersPath);
+  revalidatePath("/", "layout");
+  redirect(`${membersPath}?message=member_removed`);
 }
 
 export async function updateOrganizationSettings(formData: FormData) {
