@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { MEMBERSHIP_ROLE_LABELS } from "@/constants/roles";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { joinOrganization } from "@/features/organization/actions";
+import { ACTIVE_ORGANIZATION_MEMBER_COUNT_SELECT } from "@/features/organization/query-options";
 import { prisma } from "@/lib/prisma";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -27,7 +28,12 @@ export default async function OrganizationsPage({
       role: true,
       joinedAt: true,
       organization: {
-        select: { id: true, name: true, description: true, _count: { select: { members: true } } },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          _count: { select: ACTIVE_ORGANIZATION_MEMBER_COUNT_SELECT },
+        },
       },
     },
     orderBy: { joinedAt: "asc" },
@@ -35,7 +41,12 @@ export default async function OrganizationsPage({
   const managedOrganizations = isSystemAdmin
     ? await prisma.organization.findMany({
         where: { archivedAt: null, members: { none: { userId: user.id, status: MembershipStatus.ACTIVE } } },
-        select: { id: true, name: true, description: true, _count: { select: { members: true } } },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          _count: { select: ACTIVE_ORGANIZATION_MEMBER_COUNT_SELECT },
+        },
         orderBy: { createdAt: "asc" },
       })
     : [];
