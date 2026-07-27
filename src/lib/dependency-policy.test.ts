@@ -44,4 +44,18 @@ describe("dependency security policy", () => {
     );
     expect(adapter).toContain("braceExpansion.expand");
   });
+
+  it("copies package lifecycle scripts before installing Docker dependencies", () => {
+    const dockerfile = readFileSync(
+      new URL("../../deploy/Dockerfile", import.meta.url),
+      "utf8",
+    );
+    const scriptCopy = dockerfile.indexOf(
+      "COPY deploy/scripts/patch-brace-expansion-compat.mjs ./deploy/scripts/patch-brace-expansion-compat.mjs",
+    );
+    const install = dockerfile.indexOf("RUN npm ci");
+
+    expect(scriptCopy).toBeGreaterThan(-1);
+    expect(scriptCopy).toBeLessThan(install);
+  });
 });
