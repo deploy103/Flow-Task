@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MembershipRole, MembershipStatus } from "@prisma/client";
+import { MembershipRole, MembershipStatus, SystemRole } from "@prisma/client";
 
 const guard = vi.hoisted(() => ({ requireAuthenticatedUser: vi.fn(), requireOrganizationAccess: vi.fn() }));
 const navigation = vi.hoisted(() => ({
@@ -7,6 +7,7 @@ const navigation = vi.hoisted(() => ({
 }));
 const cache = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 const transaction = vi.hoisted(() => ({
+  user: { findUnique: vi.fn() },
   organizationMember: { findUnique: vi.fn(), count: vi.fn(), update: vi.fn() },
   departmentMember: { deleteMany: vi.fn() },
   mentorRelation: { updateMany: vi.fn() },
@@ -48,6 +49,7 @@ describe("organization membership actions", () => {
     vi.clearAllMocks();
     guard.requireAuthenticatedUser.mockResolvedValue({ id: USER_ID });
     guard.requireOrganizationAccess.mockResolvedValue({ user: { id: USER_ID } });
+    transaction.user.findUnique.mockResolvedValue({ systemRole: SystemRole.USER });
     transaction.organizationMember.findUnique.mockResolvedValue({
       userId: USER_ID,
       role: MembershipRole.MEMBER,
@@ -98,7 +100,10 @@ describe("organization membership actions", () => {
   });
 
   it("removes a member and cleans up organization-scoped active access", async () => {
-    transaction.organizationMember.findUnique.mockResolvedValue({
+    transaction.organizationMember.findUnique.mockImplementation(async ({ where }: { where: { organizationId_userId: { userId: string } } }) => where.organizationId_userId.userId === USER_ID ? {
+      role: MembershipRole.ORG_ADMIN,
+      status: MembershipStatus.ACTIVE,
+    } : {
       userId: MEMBER_ID,
       role: MembershipRole.MENTOR,
       status: MembershipStatus.ACTIVE,
@@ -132,7 +137,10 @@ describe("organization membership actions", () => {
   });
 
   it("does not remove the last active organization administrator", async () => {
-    transaction.organizationMember.findUnique.mockResolvedValue({
+    transaction.organizationMember.findUnique.mockImplementation(async ({ where }: { where: { organizationId_userId: { userId: string } } }) => where.organizationId_userId.userId === USER_ID ? {
+      role: MembershipRole.ORG_ADMIN,
+      status: MembershipStatus.ACTIVE,
+    } : {
       userId: MEMBER_ID,
       role: MembershipRole.ORG_ADMIN,
       status: MembershipStatus.ACTIVE,
@@ -145,5 +153,22 @@ describe("organization membership actions", () => {
       `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=last_admin`,
     );
     expect(transaction.organizationMember.update).not.toHaveBeenCalled();
+  });
+
+  it("performs no cleanup when the actor's organization authority was revoked", async () => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      role: MembershipRole.MEMBER,
+      status: MembershipStatus.INACTIVE,
+    });
+
+    await expect(removeOrganizationMember(removeForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=remove_failed`,
+    );
+    expect(transaction.departmentMember.deleteMany).not.toHaveBeenCalled();
+    expect(transaction.mentorRelation.updateMany).not.toHaveBeenCalled();
+    expect(transaction.question.updateMany).not.toHaveBeenCalled();
+    expect(transaction.organizationInvite.updateMany).not.toHaveBeenCalled();
+    expect(transaction.organizationMember.update).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
   });
 });

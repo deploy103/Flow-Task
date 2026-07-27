@@ -1,6 +1,6 @@
 "use server";
 
-import { MembershipRole, MembershipStatus, Prisma, QuestionStatus } from "@prisma/client";
+import { MembershipRole, MembershipStatus, Prisma, QuestionStatus, SystemRole } from "@prisma/client";
 import { addDays } from "./date";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -252,6 +252,18 @@ export async function removeOrganizationMember(formData: FormData) {
 
   try {
     await prisma.$transaction(async (transaction) => {
+      const [actor, actorMembership] = await Promise.all([
+        transaction.user.findUnique({ where: { id: user.id }, select: { systemRole: true } }),
+        transaction.organizationMember.findUnique({
+          where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: user.id } },
+          select: { role: true, status: true },
+        }),
+      ]);
+      const hasCurrentManagementAccess = actor?.systemRole === SystemRole.SYSTEM_ADMIN || (
+        actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN
+      );
+      if (!hasCurrentManagementAccess) throw new Error("FORBIDDEN");
+
       const target = await transaction.organizationMember.findUnique({
         where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: parsed.data.memberId } },
         include: {
