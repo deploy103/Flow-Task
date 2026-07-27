@@ -188,7 +188,10 @@ describe("organization membership actions", () => {
     });
     transaction.organizationInvite.findFirst.mockResolvedValue({
       id: INVITATION_ID,
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      maxUses: 10,
       revokedAt: null,
+      usedCount: 2,
       organization: { archivedAt: null },
     });
 
@@ -197,10 +200,24 @@ describe("organization membership actions", () => {
     );
     expect(transaction.organizationInvite.findFirst).toHaveBeenCalledWith({
       where: { id: INVITATION_ID, organizationId: ORGANIZATION_ID },
-      select: { id: true, revokedAt: true, organization: { select: { archivedAt: true } } },
+      select: {
+        id: true,
+        expiresAt: true,
+        maxUses: true,
+        revokedAt: true,
+        usedCount: true,
+        organization: { select: { archivedAt: true } },
+      },
     });
     expect(transaction.organizationInvite.updateMany).toHaveBeenCalledWith({
-      where: { id: INVITATION_ID, organizationId: ORGANIZATION_ID, revokedAt: null },
+      where: {
+        id: INVITATION_ID,
+        organizationId: ORGANIZATION_ID,
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+        maxUses: 10,
+        usedCount: 2,
+      },
       data: { revokedAt: expect.any(Date) },
     });
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
@@ -228,6 +245,28 @@ describe("organization membership actions", () => {
       status: MembershipStatus.ACTIVE,
     });
     transaction.organizationInvite.findFirst.mockResolvedValue(null);
+
+    await expect(revokeOrganizationInvitation(revokeInvitationForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=invitation_revoke_failed`,
+    );
+    expect(transaction.organizationInvite.updateMany).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["expired", { expiresAt: new Date("2020-01-01T00:00:00.000Z"), maxUses: 10, usedCount: 0 }],
+    ["exhausted", { expiresAt: new Date("2099-01-01T00:00:00.000Z"), maxUses: 3, usedCount: 3 }],
+  ])("does not revoke an %s invitation", async (_state, invitationState) => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      role: MembershipRole.ORG_ADMIN,
+      status: MembershipStatus.ACTIVE,
+    });
+    transaction.organizationInvite.findFirst.mockResolvedValue({
+      id: INVITATION_ID,
+      ...invitationState,
+      revokedAt: null,
+      organization: { archivedAt: null },
+    });
 
     await expect(revokeOrganizationInvitation(revokeInvitationForm())).rejects.toThrow(
       `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=invitation_revoke_failed`,

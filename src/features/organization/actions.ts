@@ -19,6 +19,7 @@ import {
   updateMemberRoleSchema,
 } from "./schemas";
 import { canLeaveOrganization } from "./permissions";
+import { getInvitationStatus } from "./invitation-status";
 import { organizationLogoPath, removeOrganizationLogo, uploadOrganizationLogo, validateOrganizationLogo } from "./logo-storage";
 
 export type InvitationActionState = {
@@ -132,15 +133,29 @@ export async function revokeOrganizationInvitation(formData: FormData) {
 
       const invitation = await transaction.organizationInvite.findFirst({
         where: { id: parsed.data.invitationId, organizationId: parsed.data.organizationId },
-        select: { id: true, revokedAt: true, organization: { select: { archivedAt: true } } },
+        select: {
+          id: true,
+          expiresAt: true,
+          maxUses: true,
+          revokedAt: true,
+          usedCount: true,
+          organization: { select: { archivedAt: true } },
+        },
       });
-      if (!invitation || invitation.revokedAt || invitation.organization.archivedAt) {
+      const revokedAt = new Date();
+      if (!invitation || invitation.organization.archivedAt || getInvitationStatus(invitation, revokedAt) !== "ACTIVE") {
         throw new Error("INVITATION_UNAVAILABLE");
       }
 
-      const revokedAt = new Date();
       const result = await transaction.organizationInvite.updateMany({
-        where: { id: invitation.id, organizationId: parsed.data.organizationId, revokedAt: null },
+        where: {
+          id: invitation.id,
+          organizationId: parsed.data.organizationId,
+          revokedAt: null,
+          expiresAt: { gt: revokedAt },
+          maxUses: invitation.maxUses,
+          usedCount: invitation.usedCount,
+        },
         data: { revokedAt },
       });
       if (result.count !== 1) throw new Error("INVITATION_UNAVAILABLE");
