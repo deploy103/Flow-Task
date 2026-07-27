@@ -15,6 +15,7 @@ import {
   organizationSchema,
   organizationSettingsSchema,
   removeOrganizationMemberSchema,
+  revokeOrganizationInvitationSchema,
   updateMemberRoleSchema,
 } from "./schemas";
 import { canLeaveOrganization } from "./permissions";
@@ -107,6 +108,58 @@ export async function createInvitation(
     message: "초대 코드는 다시 표시되지 않습니다. 안전하게 전달해 주세요.",
     invitationCode,
   };
+}
+
+export async function revokeOrganizationInvitation(formData: FormData) {
+  const parsed = revokeOrganizationInvitationSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  const membersPath = `/organizations/${parsed.data.organizationId}/members`;
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const [actor, actorMembership] = await Promise.all([
+        transaction.user.findUnique({ where: { id: user.id }, select: { systemRole: true } }),
+        transaction.organizationMember.findUnique({
+          where: { organizationId_userId: { organizationId: parsed.data.organizationId, userId: user.id } },
+          select: { role: true, status: true },
+        }),
+      ]);
+      const canManageInvitations = actor?.systemRole === SystemRole.SYSTEM_ADMIN || (
+        actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN
+      );
+      if (!canManageInvitations) throw new Error("FORBIDDEN");
+
+      const invitation = await transaction.organizationInvite.findFirst({
+        where: { id: parsed.data.invitationId, organizationId: parsed.data.organizationId },
+        select: { id: true, revokedAt: true, organization: { select: { archivedAt: true } } },
+      });
+      if (!invitation || invitation.revokedAt || invitation.organization.archivedAt) {
+        throw new Error("INVITATION_UNAVAILABLE");
+      }
+
+      const revokedAt = new Date();
+      const result = await transaction.organizationInvite.updateMany({
+        where: { id: invitation.id, organizationId: parsed.data.organizationId, revokedAt: null },
+        data: { revokedAt },
+      });
+      if (result.count !== 1) throw new Error("INVITATION_UNAVAILABLE");
+      await transaction.auditLog.create({
+        data: {
+          actorId: user.id,
+          organizationId: parsed.data.organizationId,
+          action: "INVITATION_REVOKED",
+          targetType: "ORGANIZATION_INVITE",
+          targetId: invitation.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch {
+    redirect(`${membersPath}?error=invitation_revoke_failed`);
+  }
+
+  revalidatePath(membersPath);
+  redirect(`${membersPath}?message=invitation_revoked`);
 }
 
 export async function joinOrganization(formData: FormData) {
