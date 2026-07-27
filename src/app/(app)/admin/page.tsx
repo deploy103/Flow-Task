@@ -12,12 +12,14 @@ import {
   CheckCircle2,
   Clock3,
   Database,
+  FileClock,
   HardDrive,
   Server,
   ShieldCheck,
   Users,
   XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { requireSystemAdministrator } from "@/features/auth/guards";
 import { prisma } from "@/lib/prisma";
@@ -67,6 +69,9 @@ export default async function SystemAdminDashboard() {
     users,
     newUsersToday,
     activeOrganizations,
+    activeMemberships,
+    activeAssignments,
+    visibleQuestions,
     runningInstances,
     failedDeliveries,
     pendingDeliveries,
@@ -81,6 +86,9 @@ export default async function SystemAdminDashboard() {
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: today } } }),
     prisma.organization.count({ where: { archivedAt: null } }),
+    prisma.organizationMember.count({ where: { status: "ACTIVE", organization: { archivedAt: null } } }),
+    prisma.assignment.count({ where: { archivedAt: null, organization: { archivedAt: null } } }),
+    prisma.question.count({ where: { hiddenAt: null, organization: { archivedAt: null } } }),
     prisma.challengeInstance.count({
       where: { status: { in: [ChallengeInstanceStatus.STARTING, ChallengeInstanceStatus.RUNNING] } },
     }),
@@ -129,6 +137,8 @@ export default async function SystemAdminDashboard() {
   const summaryCards = [
     { label: "전체 사용자", value: users, detail: `오늘 가입 ${newUsersToday}명`, icon: Users },
     { label: "활성 조직", value: activeOrganizations, detail: "보관되지 않은 조직", icon: Building2 },
+    { label: "활성 소속", value: activeMemberships, detail: "활동 중인 조직 구성원", icon: Users },
+    { label: "운영 콘텐츠", value: activeAssignments + visibleQuestions, detail: `과제 ${activeAssignments}건 · 질문 ${visibleQuestions}건`, icon: FileClock },
     { label: "실행 중 인스턴스", value: runningInstances, detail: "시작 중 포함", icon: Boxes },
     { label: "실패한 알림", value: failedDeliveries, detail: `대기 ${pendingDeliveries}건`, icon: XCircle },
     { label: "정리 실패 파일", value: cleanupFailures, detail: `미소비 업로드 ${pendingUploads}건`, icon: HardDrive },
@@ -198,7 +208,7 @@ export default async function SystemAdminDashboard() {
       </section>
 
       <section id="audit-logs" className="scroll-mt-24 pt-9">
-        <h2 className="text-xl font-bold">최근 감사 로그</h2>
+        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">최근 감사 로그</h2><Link className="text-sm font-semibold text-indigo-600" href="/admin/audit-logs">전체 검색</Link></div>
         <Card className="mt-4 overflow-x-auto p-0">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950"><tr><th className="px-4 py-3">시각</th><th className="px-4 py-3">작업자</th><th className="px-4 py-3">작업</th><th className="px-4 py-3">대상</th></tr></thead>

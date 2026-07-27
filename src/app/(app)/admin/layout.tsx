@@ -1,12 +1,14 @@
-import { Activity, Database, FileClock, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { Activity, Building2, Database, FileClock, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { requireSystemAdministrator } from "@/features/auth/guards";
 
 const adminNavigation = [
   { href: "/admin", label: "대시보드", icon: LayoutDashboard },
+  { href: "/admin/organizations", label: "전체 동아리", icon: Building2 },
+  { href: "/admin/users", label: "사용자", icon: Users },
   { href: "/admin#system-health", label: "시스템 상태", icon: Activity },
   { href: "/admin#jobs", label: "작업 상태", icon: Database },
-  { href: "/admin#audit-logs", label: "감사 로그", icon: FileClock },
+  { href: "/admin/audit-logs", label: "감사 로그", icon: FileClock },
 ];
 
 export default async function SystemAdminLayout({ children }: { children: React.ReactNode }) {

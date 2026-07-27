@@ -28,3 +28,7 @@ export function canReviewSubmissions(context: PermissionContext) {
         context.membership.role === MembershipRole.MENTOR))
   );
 }
+
+export function canLeaveOrganization(role: MembershipRole, activeAdministratorCount: number) {
+  return role !== MembershipRole.ORG_ADMIN || activeAdministratorCount > 1;
+}

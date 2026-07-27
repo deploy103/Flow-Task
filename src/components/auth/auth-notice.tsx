@@ -2,6 +2,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_input: "입력한 내용을 다시 확인해 주세요.",
   invalid_credentials: "이메일 또는 비밀번호가 올바르지 않습니다.",
   rate_limited: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+  email_cooldown: "메일은 5분에 한 번만 보낼 수 있습니다. 잠시 후 다시 시도해 주세요.",
   signup_failed: "가입할 수 없습니다. 잠시 후 다시 시도해 주세요.",
   email_in_use: "이미 가입된 이메일입니다.",
   email_not_verified: "로그인하려면 먼저 이메일 인증을 완료해 주세요.",

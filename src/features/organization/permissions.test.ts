@@ -1,6 +1,6 @@
 import { MembershipRole, MembershipStatus, SystemRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { canManageOrganization, canReviewSubmissions, canViewOrganization } from "./permissions";
+import { canLeaveOrganization, canManageOrganization, canReviewSubmissions, canViewOrganization } from "./permissions";
 
 describe("organization permissions", () => {
   it("allows only active organization admins to manage", () => {
@@ -31,5 +31,12 @@ describe("organization permissions", () => {
         membership: { role: MembershipRole.MEMBER, status: MembershipStatus.ACTIVE },
       }),
     ).toBe(false);
+  });
+
+  it("prevents the last organization administrator from leaving", () => {
+    expect(canLeaveOrganization(MembershipRole.MEMBER, 1)).toBe(true);
+    expect(canLeaveOrganization(MembershipRole.MENTOR, 1)).toBe(true);
+    expect(canLeaveOrganization(MembershipRole.ORG_ADMIN, 2)).toBe(true);
+    expect(canLeaveOrganization(MembershipRole.ORG_ADMIN, 1)).toBe(false);
   });
 });

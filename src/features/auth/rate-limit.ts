@@ -29,12 +29,20 @@ const policies = {
     ipAttempts: 10,
     globalAttempts: 100,
   },
+  PASSWORD: {
+    windowMilliseconds: 15 * 60 * 1_000,
+    accountAttempts: 5,
+    ipAttempts: 10,
+    globalAttempts: 100,
+  },
 } as const;
 const RATE_LIMIT_RETENTION_MILLISECONDS = 2 * 60 * 60 * 1_000;
+export const EMAIL_DELIVERY_COOLDOWN_MILLISECONDS = 5 * 60 * 1_000;
 const UNTRUSTED_DIRECT_SOURCE_KEY = "source:untrusted-direct";
 const GLOBAL_SOURCE_KEY = "global:all-clients";
 
 export type AuthRateLimitAction = keyof typeof policies;
+export type EmailDeliveryPurpose = "VERIFY" | "RESET";
 
 type AuthRateLimitCounter = {
   action: string;
@@ -42,6 +50,15 @@ type AuthRateLimitCounter = {
   attempts: number;
   windowMilliseconds: number;
 };
+
+export function getEmailDeliveryCooldownCounter(purpose: EmailDeliveryPurpose, identity: string) {
+  return {
+    action: `MAIL_${purpose}_5M`,
+    clientKey: `account:${identity.trim().toLowerCase()}`,
+    attempts: 1,
+    windowMilliseconds: EMAIL_DELIVERY_COOLDOWN_MILLISECONDS,
+  } satisfies AuthRateLimitCounter;
+}
 
 export function resolveAuthRateLimitSourceKey(
   requestHeaders: { get(name: string): string | null },
@@ -135,4 +152,16 @@ export async function consumeAuthAttempt(action: AuthRateLimitAction, identity: 
     identity,
     resolveAuthRateLimitSourceKey(requestHeaders),
   );
+}
+
+export async function consumeEmailDeliveryCooldownForContext(
+  purpose: EmailDeliveryPurpose,
+  identity: string,
+  now = new Date(),
+) {
+  return consumeAuthRateLimitCounter(getEmailDeliveryCooldownCounter(purpose, identity), now);
+}
+
+export async function consumeEmailDeliveryCooldown(purpose: EmailDeliveryPurpose, identity: string) {
+  return consumeEmailDeliveryCooldownForContext(purpose, identity);
 }

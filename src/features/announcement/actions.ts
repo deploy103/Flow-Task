@@ -10,6 +10,7 @@ import {
   announcementReferenceSchema,
   createAnnouncementSchema,
   recipientIdsSchema,
+  updateAnnouncementSchema,
 } from "./schemas";
 import { canViewAnnouncement } from "./visibility";
 
@@ -136,4 +137,97 @@ export async function confirmAnnouncement(formData: FormData) {
   });
   revalidatePath(`/organizations/${parsed.data.organizationId}/announcements/${parsed.data.announcementId}`);
   redirect(`/organizations/${parsed.data.organizationId}/announcements/${parsed.data.announcementId}?message=confirmed`);
+}
+
+export async function updateAnnouncement(formData: FormData) {
+  const parsed = updateAnnouncementSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  const parsedRecipients = recipientIdsSchema.safeParse([
+    ...new Set(formData.getAll("recipientIds").filter((value): value is string => typeof value === "string")),
+  ]);
+  const editPath = `/organizations/${parsed.data.organizationId}/announcements/${parsed.data.announcementId}/edit`;
+  if (!parsedRecipients.success) redirect(`${editPath}?error=invalid_recipients`);
+  const recipientIds = parsedRecipients.data;
+  if (parsed.data.audience === AnnouncementAudience.SELECTED_MEMBERS && recipientIds.length === 0) {
+    redirect(`${editPath}?error=recipient_required`);
+  }
+  if (parsed.data.audience === AnnouncementAudience.SELECTED_MEMBERS) {
+    const activeRecipientCount = await prisma.organizationMember.count({
+      where: {
+        organizationId: parsed.data.organizationId,
+        userId: { in: recipientIds },
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    if (activeRecipientCount !== recipientIds.length) redirect(`${editPath}?error=invalid_recipients`);
+  }
+
+  const updated = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.announcement.updateMany({
+      where: {
+        id: parsed.data.announcementId,
+        organizationId: parsed.data.organizationId,
+        archivedAt: null,
+      },
+      data: {
+        title: parsed.data.title,
+        content: parsed.data.content,
+        priority: parsed.data.priority,
+        audience: parsed.data.audience,
+      },
+    });
+    if (result.count !== 1) return false;
+    await transaction.announcementTarget.deleteMany({ where: { announcementId: parsed.data.announcementId } });
+    if (parsed.data.audience === AnnouncementAudience.SELECTED_MEMBERS) {
+      await transaction.announcementTarget.createMany({
+        data: recipientIds.map((userId) => ({ announcementId: parsed.data.announcementId, userId })),
+      });
+    }
+    // A material edit invalidates previous acknowledgements; members must
+    // explicitly confirm the current version of the notice.
+    await transaction.announcementRead.deleteMany({ where: { announcementId: parsed.data.announcementId } });
+    await transaction.auditLog.create({
+      data: {
+        actorId: user.id,
+        organizationId: parsed.data.organizationId,
+        action: "ANNOUNCEMENT_UPDATED",
+        targetType: "ANNOUNCEMENT",
+        targetId: parsed.data.announcementId,
+        metadata: { priority: parsed.data.priority, audience: parsed.data.audience },
+      },
+    });
+    return true;
+  });
+  if (!updated) redirect(`/organizations/${parsed.data.organizationId}/announcements?error=not_found`);
+  redirect(`/organizations/${parsed.data.organizationId}/announcements/${parsed.data.announcementId}?message=updated`);
+}
+
+export async function archiveAnnouncement(formData: FormData) {
+  const parsed = announcementReferenceSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_input");
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  const archived = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.announcement.updateMany({
+      where: {
+        id: parsed.data.announcementId,
+        organizationId: parsed.data.organizationId,
+        archivedAt: null,
+      },
+      data: { archivedAt: new Date() },
+    });
+    if (result.count !== 1) return false;
+    await transaction.auditLog.create({
+      data: {
+        actorId: user.id,
+        organizationId: parsed.data.organizationId,
+        action: "ANNOUNCEMENT_ARCHIVED",
+        targetType: "ANNOUNCEMENT",
+        targetId: parsed.data.announcementId,
+      },
+    });
+    return true;
+  });
+  if (!archived) redirect(`/organizations/${parsed.data.organizationId}/announcements?error=not_found`);
+  redirect(`/organizations/${parsed.data.organizationId}/announcements?message=archived`);
 }

@@ -10,7 +10,7 @@ import { NotificationBadge } from "./notification-badge";
 const navigation = [
   { href: "/dashboard", label: "홈", icon: Home },
   { href: "/notifications", label: "알림", icon: Bell },
-  { href: "/organizations/new", label: "조직 만들기", icon: Building2 },
+  { href: "/organizations", label: "조직 보기", icon: Building2 },
   { href: "/profile", label: "내 정보", icon: UserRound },
 ];
 
