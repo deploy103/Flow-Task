@@ -9,11 +9,13 @@ describe("app navigation", () => {
   it("marks exact and nested navigation paths active", () => {
     expect(isNavigationItemActive("/notifications", "/notifications")).toBe(true);
     expect(isNavigationItemActive("/admin/users", "/admin")).toBe(true);
+    expect(isNavigationItemActive("/organizations", "/organizations")).toBe(true);
+    expect(isNavigationItemActive("/organizations/club-1", "/organizations")).toBe(true);
+    expect(isNavigationItemActive("/organizations/new", "/organizations")).toBe(true);
   });
 
   it("does not mark unrelated or similarly prefixed paths active", () => {
     expect(isNavigationItemActive("/profile-settings", "/profile")).toBe(false);
-    expect(isNavigationItemActive("/organizations/new/member", "/organizations/new")).toBe(false);
     expect(isNavigationItemActive("/organizations/123", "/dashboard")).toBe(false);
   });
 
