@@ -40,7 +40,7 @@ export default async function AnnouncementsPage({ params }: { params: Promise<{ 
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-semibold text-indigo-600">조직 소식</p><h1 className="mt-1 text-3xl font-bold">공지사항</h1><p className="mt-2 text-slate-500">중요한 소식과 확인할 내용을 모아봤어요.</p></div>
+        <div><p className="text-sm font-semibold text-indigo-600">조직 소식</p><h1 className="mt-1 text-3xl font-bold">공지사항</h1><p className="mt-2 text-slate-500">게시된 공지와 확인 여부를 조회합니다.</p></div>
         {canManage && <Link href={`/organizations/${organizationId}/announcements/new`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Plus size={18} /> 공지 작성</Link>}
       </div>
       {announcements.length ? (
@@ -59,7 +59,7 @@ export default async function AnnouncementsPage({ params }: { params: Promise<{ 
           ))}
         </div>
       ) : (
-        <Card className="mt-6 border-dashed text-center"><Bell className="mx-auto text-slate-400" /><p className="mt-3 font-semibold">아직 공지가 없어요</p></Card>
+        <Card className="mt-6 border-dashed text-center"><Bell className="mx-auto text-slate-400" /><p className="mt-3 font-semibold">게시된 공지가 없습니다</p></Card>
       )}
     </div>
   );
