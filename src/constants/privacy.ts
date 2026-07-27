@@ -1,2 +1,2 @@
-export const PRIVACY_POLICY_VERSION = "2026-07-23";
+export const PRIVACY_POLICY_VERSION = "2026-07-24";
 export const MINIMUM_SIGNUP_AGE = 14;
