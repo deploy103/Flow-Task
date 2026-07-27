@@ -1,9 +1,10 @@
-import { AssignmentAudience, AssignmentFieldType, MembershipStatus } from "@prisma/client";
+import { AssignmentFieldType, MembershipStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BackLink } from "@/components/ui/back-link";
 import { createAssignment } from "@/features/assignment/actions";
+import { AssignmentAudienceField } from "@/features/assignment/components/assignment-audience-field";
 import { requireOrganizationAccess } from "@/features/organization/guards";
 import { formatKoreanDateTimeInput } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
@@ -52,8 +53,7 @@ export default async function NewAssignmentPage({ params, searchParams }: { para
           <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium">공개일 (KST)<Input type="datetime-local" name="opensAt" required defaultValue={formatKoreanDateTimeInput(now)} className="mt-2" /></label><label className="text-sm font-medium">마감일 (KST)<Input type="datetime-local" name="deadline" required defaultValue={formatKoreanDateTimeInput(defaultDeadline)} className="mt-2" /></label></div>
           <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-4 text-sm font-medium dark:bg-slate-800"><input type="checkbox" name="allowLate" /> 마감 후 지각 제출 허용</label>
           <fieldset><legend className="text-sm font-medium">일반 제출 항목 <span className="text-slate-400">(선택)</span></legend><p className="mt-1 text-xs text-slate-500">기본은 제출 내용 하나입니다. 퀴즈나 문제만 운영한다면 모두 해제해도 됩니다.</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{Object.values(AssignmentFieldType).map((type) => <label key={type} className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-medium dark:border-slate-700"><input type="checkbox" name="fieldTypes" value={type} defaultChecked={type === AssignmentFieldType.TEXT} /> {ASSIGNMENT_FIELD_LABELS[type]}</label>)}</div></fieldset>
-          <label className="block text-sm font-medium">과제 대상<select name="audience" defaultValue={AssignmentAudience.ALL_MEMBERS} className="mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"><option value={AssignmentAudience.ALL_MEMBERS}>전체 구성원</option><option value={AssignmentAudience.SELECTED_MEMBERS}>선택한 구성원</option></select></label>
-          <fieldset><legend className="text-sm font-medium">개별 대상 선택 <span className="text-slate-400">(선택 공개일 때 적용)</span></legend><div className="mt-3 grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-2">{members.map(({ user }) => <label key={user.id} className="flex items-start gap-2 rounded-lg p-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"><input type="checkbox" name="targetUserIds" value={user.id} className="mt-1" /><span><strong className="block">{user.name}</strong><span className="text-slate-500">{user.email}</span></span></label>)}</div></fieldset>
+          <AssignmentAudienceField members={members.map(({ user }) => user)} />
           <Button type="submit">과제 저장하고 계속</Button>
         </form>
       </Card>
