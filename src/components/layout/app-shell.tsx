@@ -4,6 +4,7 @@ import { logout } from "@/features/auth/actions";
 import { Button } from "@/components/ui/button";
 import { AppNavigation } from "./app-navigation";
 import { OrganizationSwitcher } from "./organization-switcher";
+import { OrganizationNavigation } from "./organization-navigation";
 
 export function AppShell({
   userName,
@@ -38,6 +39,7 @@ export function AppShell({
             </Button>
           </form>
         </header>
+        <OrganizationNavigation organizations={organizations} />
         <main className="mx-auto max-w-6xl p-4 sm:p-8" id="main-content" tabIndex={-1}>{children}</main>
         <footer className="mx-auto max-w-6xl px-4 pb-24 text-right sm:px-8 lg:pb-8">
           <Link href="/privacy" className="text-xs text-slate-500 underline underline-offset-4">개인정보처리방침</Link>
