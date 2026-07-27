@@ -34,8 +34,9 @@ export function AppShell({
           <div className="ml-auto mr-3"><OrganizationSwitcher organizations={organizations} /></div>
           <p className="mr-3 hidden text-sm font-medium sm:block">{userName}</p>
           <form action={logout}>
-            <Button type="submit" className="min-h-9 bg-transparent px-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white" aria-label="로그아웃">
+            <Button type="submit" className="min-h-9 gap-2 bg-transparent px-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white" aria-label="로그아웃">
               <LogOut size={19} />
+              <span className="hidden xl:inline">로그아웃</span>
             </Button>
           </form>
         </header>

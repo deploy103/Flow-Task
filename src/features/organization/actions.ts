@@ -11,10 +11,12 @@ import { generateInvitationCode, hashInvitationCode } from "./invitation-code";
 import {
   invitationSchema,
   joinOrganizationSchema,
+  leaveOrganizationSchema,
   organizationSchema,
   organizationSettingsSchema,
   updateMemberRoleSchema,
 } from "./schemas";
+import { canLeaveOrganization } from "./permissions";
 import { organizationLogoPath, removeOrganizationLogo, uploadOrganizationLogo, validateOrganizationLogo } from "./logo-storage";
 
 export type InvitationActionState = {
@@ -303,4 +305,83 @@ export async function updateOrganizationSettings(formData: FormData) {
   revalidatePath(`/organizations/${parsed.data.organizationId}/settings`);
   revalidatePath("/", "layout");
   redirect(`/organizations/${parsed.data.organizationId}/settings?message=updated`);
+}
+
+export async function leaveOrganization(formData: FormData) {
+  const user = await requireAuthenticatedUser();
+  const parsed = leaveOrganizationSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/profile?error=invalid_leave_request#organizations");
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const membership = await transaction.organizationMember.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: parsed.data.organizationId,
+            userId: user.id,
+          },
+        },
+        include: { organization: { select: { name: true, archivedAt: true } } },
+      });
+      if (!membership || membership.status !== MembershipStatus.ACTIVE || membership.organization.archivedAt) {
+        throw new Error("MEMBERSHIP_NOT_FOUND");
+      }
+      if (membership.organization.name !== parsed.data.confirmationName) {
+        throw new Error("CONFIRMATION_MISMATCH");
+      }
+
+      const activeAdministratorCount = membership.role === MembershipRole.ORG_ADMIN
+        ? await transaction.organizationMember.count({
+            where: {
+              organizationId: parsed.data.organizationId,
+              role: MembershipRole.ORG_ADMIN,
+              status: MembershipStatus.ACTIVE,
+            },
+          })
+        : 0;
+      if (!canLeaveOrganization(membership.role, activeAdministratorCount)) {
+        throw new Error("LAST_ADMIN");
+      }
+
+      const now = new Date();
+      await transaction.departmentMember.deleteMany({
+        where: { userId: user.id, department: { organizationId: parsed.data.organizationId } },
+      });
+      await transaction.mentorRelation.updateMany({
+        where: {
+          organizationId: parsed.data.organizationId,
+          endedAt: null,
+          OR: [{ mentorId: user.id }, { menteeId: user.id }],
+        },
+        data: { endedAt: now },
+      });
+      await transaction.organizationMember.update({
+        where: {
+          organizationId_userId: {
+            organizationId: parsed.data.organizationId,
+            userId: user.id,
+          },
+        },
+        data: { status: MembershipStatus.INACTIVE },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorId: user.id,
+          organizationId: parsed.data.organizationId,
+          action: "ORGANIZATION_LEFT",
+          targetType: "ORGANIZATION_MEMBER",
+          targetId: user.id,
+          metadata: { previousRole: membership.role },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "";
+    if (reason === "LAST_ADMIN") redirect("/profile?error=last_organization_admin#organizations");
+    if (reason === "CONFIRMATION_MISMATCH") redirect("/profile?error=organization_name_mismatch#organizations");
+    redirect("/profile?error=leave_failed#organizations");
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/profile?message=organization_left#organizations");
 }

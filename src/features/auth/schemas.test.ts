@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordChangeSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
@@ -50,6 +50,17 @@ describe("auth schemas", () => {
     expect(passwordResetSchema.safeParse({ token, password: "new-password", passwordConfirmation: "new-password" }).success).toBe(true);
     expect(passwordResetSchema.safeParse({ token, password: "new-password", passwordConfirmation: "different-password" }).success).toBe(false);
     expect(passwordResetSchema.safeParse({ token: "short", password: "new-password", passwordConfirmation: "new-password" }).success).toBe(false);
+  });
+
+  it("requires a confirmed password change different from the current password", () => {
+    const valid = {
+      currentPassword: "current-password",
+      newPassword: "new-safe-password",
+      newPasswordConfirmation: "new-safe-password",
+    };
+    expect(passwordChangeSchema.safeParse(valid).success).toBe(true);
+    expect(passwordChangeSchema.safeParse({ ...valid, newPasswordConfirmation: "different-password" }).success).toBe(false);
+    expect(passwordChangeSchema.safeParse({ ...valid, newPassword: valid.currentPassword, newPasswordConfirmation: valid.currentPassword }).success).toBe(false);
   });
 
   it("normalizes email requests through validation", () => {
