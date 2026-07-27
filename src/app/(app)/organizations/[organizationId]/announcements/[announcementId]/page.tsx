@@ -1,5 +1,6 @@
 import { AnnouncementAudience, MembershipStatus } from "@prisma/client";
-import { CheckCircle2, Clock3, Users } from "lucide-react";
+import { CheckCircle2, Clock3, Pencil, Users } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,7 +62,8 @@ export default async function AnnouncementDetailPage({
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-center gap-2">{announcement.priority === "IMPORTANT" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600 dark:bg-red-950">중요</span>}<span className="text-sm text-slate-500">{announcement.audience === AnnouncementAudience.ALL_MEMBERS ? "전체 구성원" : "선택 공개"}</span></div>
-      <h1 className="mt-3 text-3xl font-bold">{announcement.title}</h1><p className="mt-2 text-sm text-slate-500">{announcement.author.name} · {formatKoreanDateTime(announcement.publishedAt)}</p>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-3xl font-bold">{announcement.title}</h1><p className="mt-2 text-sm text-slate-500">{announcement.author.name} · {formatKoreanDateTime(announcement.publishedAt)}</p></div>{canManage && <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white" href={`/organizations/${organizationId}/announcements/${announcementId}/edit`}><Pencil size={18} /> 수정·삭제</Link>}</div>
+      {notice.message === "updated" && <p className="mt-5 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-200">공지를 수정했습니다. 확인 기록이 초기화되었습니다.</p>}
       {notice.message === "confirmed" && <p className="mt-5 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-200">공지 확인을 기록했습니다.</p>}
       <Card className="mt-6"><MarkdownContent content={announcement.content} /></Card>
       <Card className="mt-5">

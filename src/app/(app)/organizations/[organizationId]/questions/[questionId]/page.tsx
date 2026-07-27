@@ -1,24 +1,29 @@
 import { MembershipRole, MembershipStatus, QuestionBoardType, QuestionStatus } from "@prisma/client";
+import { Pencil } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { acceptQuestionAnswer, assignQuestionMentor, changeQuestionStatus, createQuestionAnswer } from "@/features/question/actions";
 import { canManageOrganization } from "@/features/organization/permissions";
-import { canAnswerQuestion, canSetQuestionStatus } from "@/features/question/policy";
+import { canAnswerQuestion, canEditQuestion, canSetQuestionStatus } from "@/features/question/policy";
 import { requireQuestionAccess } from "@/features/question/queries";
 import { formatKoreanDateTime } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
 
 const AttachmentLink = ({ id, name }: { id: string; name: string }) => <a className="text-sm font-semibold text-indigo-600 underline" href={`/api/question-attachments/${id}`}>{name}</a>;
 
-export default async function QuestionPage({ params }: { params: Promise<{ organizationId: string; questionId: string }> }) {
+export default async function QuestionPage({ params, searchParams }: { params: Promise<{ organizationId: string; questionId: string }>; searchParams: Promise<{ message?: string }> }) {
   const { organizationId, questionId } = await params;
+  const { message } = await searchParams;
   const { user, membership, question } = await requireQuestionAccess(organizationId, questionId);
   const answers = await prisma.questionAnswer.findMany({ where: { questionId, hiddenAt: null }, include: { author: { select: { name: true } }, attachments: true }, orderBy: { createdAt: "asc" } });
   const context = { userId: user.id, systemRole: user.systemRole, membership, authorId: question.authorId, assignedMentorId: question.assignedMentorId };
   const canManage = canManageOrganization({ systemRole: user.systemRole, membership });
+  const canEdit = canEditQuestion(context);
   const mentors = canManage && question.boardType === QuestionBoardType.MENTOR_QNA ? await prisma.organizationMember.findMany({ where: { organizationId, role: MembershipRole.MENTOR, status: MembershipStatus.ACTIVE }, include: { user: { select: { id: true, name: true } } }, orderBy: { user: { name: "asc" } } }) : [];
   const allowedStatuses = Object.values(QuestionStatus).filter((status) => canSetQuestionStatus(question.boardType, status, context));
-  return <div className="max-w-4xl"><p className="text-sm font-semibold text-indigo-600">{question.boardType} · {question.category} · {question.status}</p><h1 className="mt-2 text-3xl font-bold">{question.title}</h1><p className="mt-2 text-sm text-slate-500">{question.author.name} · {formatKoreanDateTime(question.createdAt)}</p>
+  return <div className="max-w-4xl"><p className="text-sm font-semibold text-indigo-600">{question.boardType} · {question.category} · {question.status}</p><div className="mt-2 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-3xl font-bold">{question.title}</h1><p className="mt-2 text-sm text-slate-500">{question.author.name} · {formatKoreanDateTime(question.createdAt)}</p></div>{canEdit && <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white" href={`/organizations/${organizationId}/questions/${questionId}/edit`}><Pencil size={18} /> 수정·삭제</Link>}</div>
+    {message === "updated" && <p className="mt-5 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-200">질문을 수정했습니다.</p>}
     <Card className="mt-6"><p className="whitespace-pre-wrap leading-7">{question.content}</p>{question.attempted && <><h2 className="mt-6 font-bold">시도한 내용</h2><p className="mt-2 whitespace-pre-wrap">{question.attempted}</p></>}{question.errorMessage && <pre className="mt-5 overflow-auto rounded-xl bg-red-950 p-4 text-sm text-red-100">{question.errorMessage}</pre>}{question.code && <pre className="mt-5 overflow-auto rounded-xl bg-slate-950 p-4 text-sm text-slate-100"><code>{question.code}</code></pre>}{question.attachments.map((file) => <div className="mt-4" key={file.id}><AttachmentLink id={file.id} name={file.originalFilename}/></div>)}</Card>
     {canManage && question.boardType === QuestionBoardType.MENTOR_QNA && <form action={assignQuestionMentor} className="mt-4 flex gap-2"><input type="hidden" name="organizationId" value={organizationId}/><input type="hidden" name="questionId" value={questionId}/><select name="mentorId" defaultValue={question.assignedMentorId ?? ""} required className="rounded-xl border px-3 dark:bg-slate-900"><option value="" disabled>담당 멘토 선택</option>{mentors.map(({user: mentor}) => <option key={mentor.id} value={mentor.id}>{mentor.name}</option>)}</select><Button>담당 지정</Button></form>}
     {allowedStatuses.length > 0 && <form action={changeQuestionStatus} className="mt-4 flex gap-2"><input type="hidden" name="organizationId" value={organizationId}/><input type="hidden" name="questionId" value={questionId}/><select name="status" defaultValue={allowedStatuses.includes(question.status) ? question.status : allowedStatuses[0]} className="rounded-xl border px-3 dark:bg-slate-900">{allowedStatuses.map((value) => <option key={value}>{value}</option>)}</select><Button>상태 변경</Button></form>}
