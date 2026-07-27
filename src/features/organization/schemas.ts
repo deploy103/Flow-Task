@@ -45,3 +45,8 @@ export const removeOrganizationMemberSchema = z.object({
   memberId: z.uuid(),
   confirmationName: z.string().trim().min(1).max(100),
 });
+
+export const revokeOrganizationInvitationSchema = z.object({
+  organizationId: z.uuid(),
+  invitationId: z.uuid(),
+});
