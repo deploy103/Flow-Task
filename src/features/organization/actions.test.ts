@@ -12,7 +12,7 @@ const transaction = vi.hoisted(() => ({
   departmentMember: { deleteMany: vi.fn() },
   mentorRelation: { updateMany: vi.fn() },
   question: { updateMany: vi.fn() },
-  organizationInvite: { updateMany: vi.fn() },
+  organizationInvite: { findFirst: vi.fn(), updateMany: vi.fn() },
   auditLog: { create: vi.fn() },
 }));
 const database = vi.hoisted(() => ({ $transaction: vi.fn() }));
@@ -23,11 +23,12 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("next/cache", () => cache);
 vi.mock("@/lib/prisma", () => ({ prisma: database }));
 
-import { leaveOrganization, removeOrganizationMember } from "./actions";
+import { leaveOrganization, removeOrganizationMember, revokeOrganizationInvitation } from "./actions";
 
 const USER_ID = "550e8400-e29b-41d4-a716-446655440000";
 const ORGANIZATION_ID = "550e8400-e29b-41d4-a716-446655440001";
 const MEMBER_ID = "550e8400-e29b-41d4-a716-446655440002";
+const INVITATION_ID = "550e8400-e29b-41d4-a716-446655440003";
 
 function leaveForm(confirmationName = "보안 동아리") {
   const formData = new FormData();
@@ -44,6 +45,13 @@ function removeForm(confirmationName = "홍길동") {
   return formData;
 }
 
+function revokeInvitationForm() {
+  const formData = new FormData();
+  formData.set("organizationId", ORGANIZATION_ID);
+  formData.set("invitationId", INVITATION_ID);
+  return formData;
+}
+
 describe("organization membership actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +65,7 @@ describe("organization membership actions", () => {
       organization: { name: "보안 동아리", archivedAt: null },
     });
     transaction.organizationMember.count.mockResolvedValue(2);
+    transaction.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
     database.$transaction.mockImplementation(async (callback: (client: typeof transaction) => unknown) => callback(transaction));
   });
 
@@ -169,6 +178,61 @@ describe("organization membership actions", () => {
     expect(transaction.question.updateMany).not.toHaveBeenCalled();
     expect(transaction.organizationInvite.updateMany).not.toHaveBeenCalled();
     expect(transaction.organizationMember.update).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("revokes only an invitation in the requested organization", async () => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      role: MembershipRole.ORG_ADMIN,
+      status: MembershipStatus.ACTIVE,
+    });
+    transaction.organizationInvite.findFirst.mockResolvedValue({
+      id: INVITATION_ID,
+      revokedAt: null,
+      organization: { archivedAt: null },
+    });
+
+    await expect(revokeOrganizationInvitation(revokeInvitationForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?message=invitation_revoked`,
+    );
+    expect(transaction.organizationInvite.findFirst).toHaveBeenCalledWith({
+      where: { id: INVITATION_ID, organizationId: ORGANIZATION_ID },
+      select: { id: true, revokedAt: true, organization: { select: { archivedAt: true } } },
+    });
+    expect(transaction.organizationInvite.updateMany).toHaveBeenCalledWith({
+      where: { id: INVITATION_ID, organizationId: ORGANIZATION_ID, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(transaction.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "INVITATION_REVOKED", targetId: INVITATION_ID }),
+    });
+  });
+
+  it("does not inspect or revoke invitations after the actor loses authority", async () => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      role: MembershipRole.MEMBER,
+      status: MembershipStatus.INACTIVE,
+    });
+
+    await expect(revokeOrganizationInvitation(revokeInvitationForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=invitation_revoke_failed`,
+    );
+    expect(transaction.organizationInvite.findFirst).not.toHaveBeenCalled();
+    expect(transaction.organizationInvite.updateMany).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("does not revoke an invitation that is outside the requested organization", async () => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      role: MembershipRole.ORG_ADMIN,
+      status: MembershipStatus.ACTIVE,
+    });
+    transaction.organizationInvite.findFirst.mockResolvedValue(null);
+
+    await expect(revokeOrganizationInvitation(revokeInvitationForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?error=invitation_revoke_failed`,
+    );
+    expect(transaction.organizationInvite.updateMany).not.toHaveBeenCalled();
     expect(transaction.auditLog.create).not.toHaveBeenCalled();
   });
 });
