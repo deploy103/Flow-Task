@@ -39,3 +39,9 @@ export const leaveOrganizationSchema = z.object({
   organizationId: z.uuid(),
   confirmationName: z.string().trim().min(2).max(80),
 });
+
+export const removeOrganizationMemberSchema = z.object({
+  organizationId: z.uuid(),
+  memberId: z.uuid(),
+  confirmationName: z.string().trim().min(1).max(100),
+});
