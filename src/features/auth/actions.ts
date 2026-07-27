@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getAuthEmailEnvironment } from "@/lib/env";
-import { emailRequestSchema, loginSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
+import { emailRequestSchema, loginSchema, passwordChangeSchema, passwordResetSchema, profileSchema, signUpSchema, verificationTokenSchema } from "./schemas";
 import { requireAuthenticatedUser } from "./guards";
 import { hashPassword, verifyPassword } from "./password";
 import { createUserSession, revokeCurrentSession } from "./session";
@@ -188,4 +188,40 @@ export async function updateProfile(formData: FormData) {
 
   revalidatePath("/profile");
   redirect("/profile?message=updated");
+}
+
+export async function changePassword(formData: FormData) {
+  const user = await requireAuthenticatedUser();
+  const parsed = passwordChangeSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/profile?error=invalid_password_change#security");
+  if (!(await consumeAuthAttempt("PASSWORD", user.email))) {
+    redirect("/profile?error=password_change_rate_limited#security");
+  }
+
+  const credential = await prisma.userCredential.findUnique({ where: { userId: user.id } });
+  if (!credential || !(await verifyPassword(parsed.data.currentPassword, credential.passwordHash))) {
+    redirect("/profile?error=current_password_incorrect#security");
+  }
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+  try {
+    await prisma.$transaction([
+      prisma.userCredential.update({ where: { userId: user.id }, data: { passwordHash } }),
+      prisma.authSession.deleteMany({ where: { userId: user.id } }),
+      prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+      prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "PASSWORD_CHANGED",
+          targetType: "USER",
+          targetId: user.id,
+        },
+      }),
+    ]);
+  } catch {
+    redirect("/profile?error=password_change_failed#security");
+  }
+
+  await revokeCurrentSession();
+  redirect("/login?message=password_updated");
 }

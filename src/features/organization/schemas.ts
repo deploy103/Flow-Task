@@ -34,3 +34,8 @@ export const organizationSettingsSchema = z.object({
   description: z.string().trim().max(500).transform((value) => value || null),
   removeLogo: z.literal("on").optional().transform(Boolean),
 });
+
+export const leaveOrganizationSchema = z.object({
+  organizationId: z.uuid(),
+  confirmationName: z.string().trim().min(2).max(80),
+});
