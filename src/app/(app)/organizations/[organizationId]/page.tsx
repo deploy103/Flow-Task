@@ -22,7 +22,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ o
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">{organization.logoStoragePath && <Image src={`/api/organizations/${organizationId}/logo`} alt={`${organization.name} 로고`} width={72} height={72} unoptimized className="size-16 rounded-2xl border object-cover sm:size-[72px]"/>}<div><p className="text-sm font-semibold text-indigo-600">{membership ? MEMBERSHIP_ROLE_LABELS[membership.role] : "시스템 관리자"}</p><h1 className="mt-1 text-3xl font-bold">{organization.name}</h1><p className="mt-2 max-w-2xl text-slate-500">{organization.description ?? "조직의 활동과 구성원을 한곳에서 관리하세요."}</p></div></div>
+        <div className="flex items-start gap-4">{organization.logoStoragePath && <Image src={`/api/organizations/${organizationId}/logo`} alt={`${organization.name} 로고`} width={72} height={72} unoptimized className="size-16 rounded-2xl border object-cover sm:size-[72px]"/>}<div><p className="text-sm font-semibold text-indigo-600">{membership ? MEMBERSHIP_ROLE_LABELS[membership.role] : "시스템 관리자"}</p><h1 className="mt-1 text-3xl font-bold">{organization.name}</h1><p className="mt-2 max-w-2xl text-slate-500">{organization.description ?? "등록된 조직 설명이 없습니다."}</p></div></div>
         {canManage && <Link href={`/organizations/${organizationId}/settings`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Settings size={18} /> 조직 설정</Link>}
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
