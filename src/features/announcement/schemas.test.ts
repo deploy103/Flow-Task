@@ -1,6 +1,6 @@
 import { AnnouncementAudience, AnnouncementPriority } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { createAnnouncementSchema, recipientIdsSchema } from "./schemas";
+import { createAnnouncementSchema, recipientIdsSchema, updateAnnouncementSchema } from "./schemas";
 
 describe("announcement schemas", () => {
   it("accepts a valid announcement", () => {
@@ -16,5 +16,11 @@ describe("announcement schemas", () => {
   it("limits recipient count and validates UUIDs", () => {
     expect(recipientIdsSchema.safeParse(["not-a-uuid"]).success).toBe(false);
     expect(recipientIdsSchema.safeParse(Array.from({ length: 501 }, () => "fd7736d1-ecc0-4c23-b12c-84077b66dca4")).success).toBe(false);
+  });
+
+  it("requires a valid announcement identifier when updating", () => {
+    const input = { organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4", announcementId: "bad", title: "수정 공지", content: "수정한 내용", priority: AnnouncementPriority.NORMAL, audience: AnnouncementAudience.ALL_MEMBERS };
+    expect(updateAnnouncementSchema.safeParse(input).success).toBe(false);
+    expect(updateAnnouncementSchema.safeParse({ ...input, announcementId: "5a9db51d-47e7-4da7-b90d-6bc2530098ab" }).success).toBe(true);
   });
 });
