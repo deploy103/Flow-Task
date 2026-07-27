@@ -10,12 +10,12 @@ export default async function LoginPage({
 }) {
   const notice = await searchParams;
   return (
-    <AuthShell title="다시 만나 반가워요" description="해야 할 일과 조직 소식을 한곳에서 확인하세요.">
+    <AuthShell title="로그인" description="가입한 이메일과 비밀번호를 입력하세요.">
       <AuthNotice {...notice} />
       <LoginForm />
       <div className="mt-4 text-right"><Link href="/forgot-password" className="text-sm font-semibold text-indigo-600">비밀번호를 잊으셨나요?</Link></div>
       <p className="mt-6 text-center text-sm text-slate-500">
-        처음이신가요? <Link href="/signup" className="font-semibold text-indigo-600">회원가입</Link>
+        계정이 없으신가요? <Link href="/signup" className="font-semibold text-indigo-600">회원가입</Link>
       </p>
     </AuthShell>
   );

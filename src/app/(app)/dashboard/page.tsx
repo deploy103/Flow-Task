@@ -25,7 +25,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-semibold text-indigo-600">오늘도 차근차근</p><h1 className="mt-1 text-3xl font-bold">안녕하세요, {user.name}님!</h1></div>
+        <div><p className="text-sm font-semibold text-indigo-600">대시보드</p><h1 className="mt-1 text-3xl font-bold">{user.name}님의 조직</h1></div>
         <Link href="/organizations/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-semibold text-white"><Plus size={18} /> 조직 만들기</Link>
       </div>
 
@@ -38,14 +38,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <Card className="group h-full transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md">
                   <div className="flex items-start justify-between"><span className="rounded-xl bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-950"><Building2 /></span><ArrowRight className="text-slate-400 transition group-hover:translate-x-1" /></div>
                   <h3 className="mt-5 text-lg font-bold">{organization.name}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{organization.description ?? "함께 할 일을 관리해 보세요."}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{organization.description ?? "등록된 조직 설명이 없습니다."}</p>
                   <span className="mt-4 inline-block rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold dark:bg-slate-800">{role}</span>
                 </Card>
               </Link>
             ))}
           </div>
         ) : (
-          <Card className="mt-4 border-dashed text-center"><Building2 className="mx-auto text-slate-400" /><p className="mt-3 font-semibold">아직 가입한 조직이 없어요</p><p className="mt-1 text-sm text-slate-500">새 조직을 만들거나 받은 초대 코드를 입력해 주세요.</p></Card>
+          <Card className="mt-4 border-dashed text-center"><Building2 className="mx-auto text-slate-400" /><p className="mt-3 font-semibold">가입한 조직이 없습니다</p><p className="mt-1 text-sm text-slate-500">조직을 만들거나 관리자에게 받은 초대 코드로 가입하세요.</p></Card>
         )}
       </section>
 
