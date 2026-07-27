@@ -8,7 +8,7 @@ const adminNavigation = [
   { href: "/admin/users", label: "사용자", icon: Users },
   { href: "/admin#system-health", label: "시스템 상태", icon: Activity },
   { href: "/admin#jobs", label: "작업 상태", icon: Database },
-  { href: "/admin#audit-logs", label: "감사 로그", icon: FileClock },
+  { href: "/admin/audit-logs", label: "감사 로그", icon: FileClock },
 ];
 
 export default async function SystemAdminLayout({ children }: { children: React.ReactNode }) {
