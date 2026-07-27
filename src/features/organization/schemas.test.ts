@@ -1,6 +1,6 @@
 import { MembershipRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { invitationSchema, joinOrganizationSchema, organizationSettingsSchema } from "./schemas";
+import { invitationSchema, joinOrganizationSchema, leaveOrganizationSchema, organizationSettingsSchema } from "./schemas";
 
 describe("organization schemas", () => {
   it("rejects issuing administrator invitations", () => {
@@ -37,5 +37,15 @@ describe("organization schemas", () => {
     });
     expect(result.description).toBeNull();
     expect(result.removeLogo).toBe(true);
+  });
+
+  it("requires an organization id and confirmation name to leave", () => {
+    const input = {
+      organizationId: "fd7736d1-ecc0-4c23-b12c-84077b66dca4",
+      confirmationName: "보안 동아리",
+    };
+    expect(leaveOrganizationSchema.safeParse(input).success).toBe(true);
+    expect(leaveOrganizationSchema.safeParse({ ...input, confirmationName: "" }).success).toBe(false);
+    expect(leaveOrganizationSchema.safeParse({ ...input, organizationId: "invalid" }).success).toBe(false);
   });
 });

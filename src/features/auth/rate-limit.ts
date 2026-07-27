@@ -29,6 +29,12 @@ const policies = {
     ipAttempts: 10,
     globalAttempts: 100,
   },
+  PASSWORD: {
+    windowMilliseconds: 15 * 60 * 1_000,
+    accountAttempts: 5,
+    ipAttempts: 10,
+    globalAttempts: 100,
+  },
 } as const;
 const RATE_LIMIT_RETENTION_MILLISECONDS = 2 * 60 * 60 * 1_000;
 export const EMAIL_DELIVERY_COOLDOWN_MILLISECONDS = 5 * 60 * 1_000;
