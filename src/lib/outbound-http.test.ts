@@ -1,5 +1,8 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { Agent, fetch } from "undici";
 import { describe, expect, it } from "vitest";
-import { isPublicNetworkAddress, readBoundedJsonResponse, selectPublicDnsAddress, validatePublicHttpsUrl } from "./outbound-http";
+import { createPublicNetworkLookup, isPublicNetworkAddress, readBoundedJsonResponse, selectPublicDnsAddress, validatePublicHttpsUrl } from "./outbound-http";
 
 describe("outbound network policy", () => {
   it("allows globally routable addresses and rejects local, private and mapped addresses", () => {
@@ -23,6 +26,27 @@ describe("outbound network policy", () => {
     expect(selectPublicDnsAddress([{ address: "8.8.8.8", family: 4 }])).toEqual({ address: "8.8.8.8", family: 4 });
     expect(selectPublicDnsAddress([{ address: "8.8.8.8", family: 4 }, { address: "10.0.0.8", family: 4 }])).toBeNull();
     expect(selectPublicDnsAddress([])).toBeNull();
+  });
+
+  it("returns an address array when Undici requests all lookup results", async () => {
+    const server = createServer((_request, response) => response.end("ok"));
+    await new Promise<void>((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
+    const { port } = server.address() as AddressInfo;
+    const dispatcher = new Agent({
+      connect: {
+        lookup: createPublicNetworkLookup(
+          (_hostname, _options, callback) => callback(null, [{ address: "127.0.0.1", family: 4 }]),
+          () => true,
+        ),
+      },
+    });
+    try {
+      const response = await fetch(`http://lookup-contract.test:${port}`, { dispatcher });
+      await expect(response.text()).resolves.toBe("ok");
+    } finally {
+      await dispatcher.close();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
   });
 
   it("reads only bounded JSON responses", async () => {
