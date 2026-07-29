@@ -12,5 +12,8 @@ describe("outbound integration URL policy", () => {
     expect(validateIntegrationUrl("https://relay.example.com/v1/send", OrganizationIntegrationKind.EMAIL_RELAY, [])).toBeNull();
     expect(validateIntegrationUrl("https://user:pass@relay.example.com/v1/send", OrganizationIntegrationKind.EMAIL_RELAY, ["relay.example.com"])).toBeNull();
     expect(validateIntegrationUrl("https://127.0.0.1/hook", OrganizationIntegrationKind.GENERIC_WEBHOOK, ["127.0.0.1"])).toBeNull();
+    expect(validateIntegrationUrl("https://[::1]/hook", OrganizationIntegrationKind.GENERIC_WEBHOOK, ["[::1]"])).toBeNull();
+    expect(validateIntegrationUrl("https://[::ffff:127.0.0.1]/hook", OrganizationIntegrationKind.GENERIC_WEBHOOK, ["[::ffff:7f00:1]"])).toBeNull();
+    expect(validateIntegrationUrl("https://100.64.0.1/hook", OrganizationIntegrationKind.GENERIC_WEBHOOK, ["100.64.0.1"])).toBeNull();
   });
 });

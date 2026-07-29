@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 const JSON_CONTENT_TYPE = "application/json";
 
 function parseOrigin(value: string | null) {
@@ -5,12 +7,26 @@ function parseOrigin(value: string | null) {
   try { return new URL(value).origin; } catch { return null; }
 }
 
-export function hasTrustedMutationOrigin(request: Request) {
+export function hasTrustedMutationOrigin(
+  request: Request,
+  configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL,
+  production = process.env.NODE_ENV === "production",
+) {
   const origin = parseOrigin(request.headers.get("origin"));
   if (!origin) return false;
   const requestOrigin = new URL(request.url).origin;
-  const configuredOrigin = parseOrigin(process.env.NEXT_PUBLIC_APP_URL ?? null);
-  return origin === requestOrigin || origin === configuredOrigin;
+  const configuredOrigin = parseOrigin(configuredBaseUrl ?? null);
+  if (production) return configuredOrigin !== null && origin === configuredOrigin;
+  return origin === requestOrigin || (configuredOrigin !== null && origin === configuredOrigin);
+}
+
+export function resolveTrustedClientIp(
+  requestHeaders: { get(name: string): string | null },
+  trustProxy = process.env.AUTH_TRUST_PROXY === "true",
+) {
+  if (!trustProxy) return null;
+  const proxyAddress = requestHeaders.get("x-real-ip")?.trim();
+  return proxyAddress && isIP(proxyAddress) ? proxyAddress : null;
 }
 
 export async function readBoundedJson(request: Request, maximumBytes: number): Promise<{ success: true; data: unknown } | { success: false }> {
