@@ -18,6 +18,20 @@ case "$command_name:$*" in
       printf '%s\n' '22/tcp                     LIMIT IN    Anywhere'
     fi
     ;;
+  'ufw:show added')
+    if [ "${STUB_RESTRICTED_SSH:-true}" = true ]; then
+      printf '%s\n' 'ufw limit from 10.0.0.0/24 to any port 22 proto tcp'
+    else
+      printf '%s\n' 'ufw limit 22/tcp'
+    fi
+    if [ "${STUB_UFW_ROLE:-proxy}" = app ]; then
+      printf '%s\n' 'ufw allow from 10.0.0.12 to any port 3000 proto tcp'
+    else
+      printf '%s\n' 'ufw allow 80/tcp' 'ufw allow 443/tcp'
+    fi
+    [ "${STUB_UNEXPECTED_UFW:-false}" != true ] || printf '%s\n' 'ufw allow 5432/tcp'
+    [ "${STUB_DUPLICATE_UFW:-false}" != true ] || printf '%s\n' 'ufw allow 443/tcp'
+    ;;
   'id:www-data') exit 0 ;;
   'id:-nG www-data') printf '%s\n' 'www-data' ;;
   'nginx:-t') exit 0 ;;
@@ -29,6 +43,15 @@ case "$command_name:$*" in
   'systemctl:is-active --quiet fail2ban.service') exit 0 ;;
   'systemctl:is-enabled --quiet unattended-upgrades.service') exit 0 ;;
   'fail2ban-client:status') printf '%s\n' 'Jail list: sshd' ;;
-  'apt-get:-s upgrade') printf '%s\n' '0 upgraded, 0 newly installed' ;;
+  'apt-get:-s upgrade')
+    [ "${STUB_APT_SUCCESS:-true}" = true ] || exit 100
+    if [ "${STUB_APT_MALFORMED:-false}" = true ]; then
+      printf '%s\n' 'upgrade state unavailable'
+    elif [ "${STUB_APT_HELD:-false}" = true ]; then
+      printf '%s\n' '0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.'
+    else
+      printf '%s\n' '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'
+    fi
+    ;;
   *) exit 1 ;;
 esac
