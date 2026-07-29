@@ -94,6 +94,8 @@ Docker Compose 예시는 [deploy/docker-compose.example.yml](deploy/docker-compo
 
 앱과 리버스 프록시가 같은 서버라면 `APP_BIND_ADDRESS=127.0.0.1` 기본값을 유지합니다. 별도 프록시 서버가 앱 서버의 사설 주소로 접근하는 구성에서만 `APP_BIND_ADDRESS`를 해당 사설 주소로 바꾸고, `deploy/scripts/harden-host-firewall.sh --role app --proxy-source <프록시 사설 IP> --app-bind-address <앱 사설 IP>`로 앱 포트를 프록시 한 곳에만 허용합니다. 스크립트는 기본적으로 계획만 출력하며 검토 후 root로 `--apply`를 지정해야 실제 UFW와 Docker `DOCKER-USER` 체인을 변경합니다. 예상 외 기존 UFW 허용 규칙이 있으면 적용 전에 중단합니다.
 
+운영 호스트의 기본 보안 12개 항목은 `sudo sh deploy/scripts/audit-host-security.sh proxy|app`으로 읽기 전용 점검할 수 있습니다. SSH는 `harden-ssh-access.sh`의 prepare 단계에서 키를 추가하고 별도 세션의 키 로그인을 증명한 뒤에만 enforce 단계로 비밀번호 인증을 차단합니다. 전체 기준과 운영 점검표는 [docs/security-baseline-12.md](docs/security-baseline-12.md)에 있습니다.
+
 Compose의 마이그레이션 서비스는 자체 인증 전환 전에 기존 사용자 중 로컬 credential이 없는 사용자가 0명인지 강제로 검사합니다. 누락 사용자가 있으면 배포를 중단하므로 먼저 별도의 비밀번호 설정·재설정 절차를 마련해야 합니다. preflight 로그에는 사용자 식별자를 출력하지 않습니다.
 
 최초 시스템 관리자는 마이그레이션 완료 후 운영 서버의 `deploy` 디렉터리에서 다음처럼 생성합니다. 비밀번호는 셸 기록이나 파일에 남기지 말고 일시적인 환경변수로만 전달합니다.
