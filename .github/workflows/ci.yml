@@ -59,8 +59,11 @@ jobs:
         run: npm run test:db
       - name: Cleanup workflow script tests
         run: sh deploy/scripts/test-submission-cleanup.sh
-      - name: Host firewall script tests
-        run: sh deploy/scripts/test-host-firewall.sh
+      - name: Host security script tests
+        run: |
+          sh deploy/scripts/test-host-security-audit.sh
+          sh deploy/scripts/test-harden-ssh-access.sh
+          sh deploy/scripts/test-host-firewall.sh
       - name: Production build
         run: npm run build
       - name: Dependency audit
