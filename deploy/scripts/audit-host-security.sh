@@ -29,10 +29,42 @@ else
 fi
 
 ufw_status=$(ufw status 2>/dev/null || true)
-if command -v ufw >/dev/null 2>&1 && printf '%s\n' "$ufw_status" | grep -q '^Status: active'; then
-  result PASS 2 "UFW active"
+ufw_added=$(ufw show added 2>/dev/null | sed -n '/^ufw /p' || true)
+ufw_rules_valid=false
+ssh_port=$(printf '%s\n' "$sshd_effective" | awk '$1 == "port" {print $2; exit}')
+ssh_port=${ssh_port:-22}
+
+restricted_ssh_added=$(printf '%s\n' "$ufw_added" |
+  grep -E "^ufw limit from [0-9]+(\.[0-9]+){3}(/[0-9]+)? to any port ${ssh_port} proto tcp$" |
+  grep -Ev '^ufw limit from 0\.0\.0\.0/0 ' |
+  head -1 || true)
+if [ "$role" = "proxy" ]; then
+  rule_count=$(printf '%s\n' "$ufw_added" | grep -c '^ufw ' || true)
+  if [ "$rule_count" -eq 3 ] && [ -n "$restricted_ssh_added" ] &&
+    [ "$(printf '%s\n' "$ufw_added" | grep -Fxc 'ufw allow 80/tcp')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$ufw_added" | grep -Fxc 'ufw allow 443/tcp')" -eq 1 ]; then
+    ufw_rules_valid=true
+  fi
 else
-  result FAIL 2 "host firewall inactive or unavailable"
+  firewall_configuration="${system_root}/etc/flow-task/firewall.conf"
+  proxy_source=$(sed -n 's/^PROXY_SOURCE=//p' "$firewall_configuration" 2>/dev/null | head -1)
+  app_port=$(sed -n 's/^APP_PORT=//p' "$firewall_configuration" 2>/dev/null | head -1)
+  expected_app_rule="ufw allow from ${proxy_source} to any port ${app_port} proto tcp"
+  rule_count=$(printf '%s\n' "$ufw_added" | grep -c '^ufw ' || true)
+  if [ "$rule_count" -eq 2 ] && [ -n "$restricted_ssh_added" ] &&
+    printf '%s\n' "$proxy_source" | grep -Eq '^[0-9]+(\.[0-9]+){3}(/[0-9]+)?$' &&
+    printf '%s\n' "$app_port" | grep -Eq '^[0-9]+$' &&
+    [ "$(printf '%s\n' "$ufw_added" | grep -Fxc "$expected_app_rule")" -eq 1 ]; then
+    ufw_rules_valid=true
+  fi
+fi
+
+if command -v ufw >/dev/null 2>&1 &&
+  printf '%s\n' "$ufw_status" | grep -q '^Status: active' &&
+  [ "$ufw_rules_valid" = true ]; then
+  result PASS 2 "UFW active with only role-allowed rules"
+else
+  result FAIL 2 "UFW inactive, unavailable, duplicated, or contains rules outside the role allowlist"
 fi
 
 service_user=www-data
@@ -47,8 +79,6 @@ else
   result WARN 3 "host web service account not present; inspect container user separately"
 fi
 
-ssh_port=$(printf '%s\n' "$sshd_effective" | awk '$1 == "port" {print $2; exit}')
-ssh_port=${ssh_port:-22}
 restricted_ssh_source=$(printf '%s\n' "$ufw_status" |
   grep -E "^${ssh_port}(/tcp)?[[:space:]]+(LIMIT|ALLOW)[[:space:]]+IN[[:space:]]+" |
   grep -Ev '(Anywhere|0\.0\.0\.0/0|::/0)' | head -1 || true)
@@ -122,11 +152,24 @@ else
   result FAIL 11 "Fail2ban inactive or no jail configured"
 fi
 
-pending_updates=$(LC_ALL=C apt-get -s upgrade 2>/dev/null | awk '/^Inst / {count++} END {print count+0}')
-if systemctl is-enabled --quiet unattended-upgrades.service 2>/dev/null && [ "$pending_updates" -eq 0 ]; then
-  result PASS 12 "automatic security updates enabled and no pending upgrades"
-else
-  result FAIL 12 "automatic updates disabled or $pending_updates package upgrades pending"
+upgrade_state_known=false
+if simulated_upgrade=$(LC_ALL=C apt-get -s upgrade 2>/dev/null) &&
+  printf '%s\n' "$simulated_upgrade" |
+    grep -Eq '^[0-9]+ upgraded, [0-9]+ newly installed, [0-9]+ to remove and [0-9]+ not upgraded\.$'; then
+  upgrade_state_known=true
+  pending_updates=$(printf '%s\n' "$simulated_upgrade" | awk '
+    /^Inst / {installable++}
+    /^[0-9]+ upgraded, [0-9]+ newly installed,/ {held = $(NF - 2)}
+    END {print installable + held + 0}
+  ')
+  if systemctl is-enabled --quiet unattended-upgrades.service 2>/dev/null && [ "$pending_updates" -eq 0 ]; then
+    result PASS 12 "automatic security updates enabled and no pending upgrades"
+  else
+    result FAIL 12 "automatic updates disabled or $pending_updates package upgrades pending"
+  fi
+fi
+if [ "$upgrade_state_known" != true ]; then
+  result FAIL 12 "package upgrade simulation failed; update state is unknown"
 fi
 
 printf 'SUMMARY pass=%s fail=%s warn=%s\n' "$passed" "$failed" "$warnings"
