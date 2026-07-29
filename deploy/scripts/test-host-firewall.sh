@@ -13,6 +13,10 @@ printf '%s\n' "$proxy_plan" | grep -q '^ufw limit 2222/tcp$' || fail "custom SSH
 printf '%s\n' "$proxy_plan" | grep -q '^ufw allow 443/tcp$' || fail "proxy HTTPS rule missing"
 printf '%s\n' "$proxy_plan" | grep -q 'port 3000' && fail "proxy plan exposed app port"
 
+restricted_proxy_plan=$(sh "$script" --role proxy --ssh-source 10.0.0.0/24)
+printf '%s\n' "$restricted_proxy_plan" | grep -q '^ufw limit from 10.0.0.0/24 to any port 22 proto tcp$' || fail "SSH source restriction missing"
+printf '%s\n' "$restricted_proxy_plan" | grep -q '^ufw limit 22/tcp$' && fail "global SSH rule remained"
+
 app_plan=$(sh "$script" --role app --proxy-source 10.0.0.12 --app-bind-address 10.0.0.225 --app-port 3000)
 printf '%s\n' "$app_plan" | grep -q '^ufw allow from 10.0.0.12 to any port 3000 proto tcp$' || fail "app source restriction missing"
 printf '%s\n' "$app_plan" | grep -q 'allow 80' && fail "app plan exposed HTTP"
@@ -25,6 +29,15 @@ if sh "$script" --role app --proxy-source 10.0.0.0/99 --app-bind-address 10.0.0.
 fi
 if sh "$script" --role proxy --ssh-port 0 >/dev/null 2>&1; then
   fail "invalid SSH port accepted"
+fi
+if sh "$script" --role proxy --ssh-source 10.0.0.0/99 >/dev/null 2>&1; then
+  fail "invalid SSH source accepted"
+fi
+if sh "$script" --role proxy --ssh-source 10.0.0.1/0 >/dev/null 2>&1; then
+  fail "global SSH CIDR accepted"
+fi
+if sh "$script" --role app --proxy-source 10.0.0.1/0 --app-bind-address 10.0.0.225 >/dev/null 2>&1; then
+  fail "global proxy CIDR accepted"
 fi
 
 stub_directory="$temporary_directory/bin"

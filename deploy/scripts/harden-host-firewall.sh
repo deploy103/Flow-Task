@@ -4,9 +4,11 @@ set -eu
 usage() {
   cat <<'EOF'
 Usage:
-  harden-host-firewall.sh --role proxy [--ssh-port PORT] [--apply]
+  harden-host-firewall.sh --role proxy [--ssh-source IPv4[/PREFIX]]
+                          [--ssh-port PORT] [--apply]
   harden-host-firewall.sh --role app --proxy-source IPv4[/PREFIX]
                           --app-bind-address IPv4
+                          [--ssh-source IPv4[/PREFIX]]
                           [--app-port PORT] [--ssh-port PORT] [--apply]
 
 Without --apply, validated UFW commands are printed but no host setting changes.
@@ -15,6 +17,7 @@ EOF
 
 role=""
 proxy_source=""
+ssh_source=""
 app_bind_address=""
 ssh_port="22"
 app_port="3000"
@@ -24,6 +27,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --role) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; role=$2; shift 2 ;;
     --proxy-source) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; proxy_source=$2; shift 2 ;;
+    --ssh-source) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; ssh_source=$2; shift 2 ;;
     --app-bind-address) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; app_bind_address=$2; shift 2 ;;
     --ssh-port) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; ssh_port=$2; shift 2 ;;
     --app-port) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; app_port=$2; shift 2 ;;
@@ -41,7 +45,7 @@ valid_port() {
 valid_ipv4_source() {
   printf '%s\n' "$1" | awk -F/ '
     NF < 1 || NF > 2 { exit 1 }
-    NF == 2 && ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 > 32) { exit 1 }
+    NF == 2 && ($2 !~ /^[0-9]+$/ || $2 < 1 || $2 > 32) { exit 1 }
     {
       count = split($1, octets, ".")
       if (count != 4) exit 1
@@ -58,6 +62,10 @@ valid_ipv4_source() {
 }
 valid_port "$ssh_port" || { printf '%s\n' "Invalid SSH port." >&2; exit 2; }
 valid_port "$app_port" || { printf '%s\n' "Invalid application port." >&2; exit 2; }
+if [ -n "$ssh_source" ] && ! valid_ipv4_source "$ssh_source"; then
+  printf '%s\n' "Invalid --ssh-source." >&2
+  exit 2
+fi
 if [ "$role" = "app" ]; then
   [ -n "$proxy_source" ] && valid_ipv4_source "$proxy_source" || {
     printf '%s\n' "The app role requires a valid --proxy-source." >&2
@@ -71,7 +79,11 @@ if [ "$role" = "app" ]; then
 fi
 
 expected_rules() {
-  printf '%s\n' "ufw limit ${ssh_port}/tcp"
+  if [ -n "$ssh_source" ]; then
+    printf 'ufw limit from %s to any port %s proto tcp\n' "$ssh_source" "$ssh_port"
+  else
+    printf '%s\n' "ufw limit ${ssh_port}/tcp"
+  fi
   if [ "$role" = "proxy" ]; then
     printf '%s\n' "ufw allow 80/tcp" "ufw allow 443/tcp"
   else
@@ -80,10 +92,12 @@ expected_rules() {
 }
 
 print_plan() {
-  printf '%s\n' \
-    "ufw default deny incoming" \
-    "ufw default allow outgoing" \
-    "ufw limit ${ssh_port}/tcp"
+  printf '%s\n' "ufw default deny incoming" "ufw default allow outgoing"
+  if [ -n "$ssh_source" ]; then
+    printf 'ufw limit from %s to any port %s proto tcp\n' "$ssh_source" "$ssh_port"
+  else
+    printf '%s\n' "ufw limit ${ssh_port}/tcp"
+  fi
   if [ "$role" = "proxy" ]; then
     printf '%s\n' "ufw allow 80/tcp" "ufw allow 443/tcp"
   else
@@ -125,7 +139,11 @@ fi
 
 ufw default deny incoming
 ufw default allow outgoing
-ufw limit "${ssh_port}/tcp"
+if [ -n "$ssh_source" ]; then
+  ufw limit from "$ssh_source" to any port "$ssh_port" proto tcp
+else
+  ufw limit "${ssh_port}/tcp"
+fi
 if [ "$role" = "proxy" ]; then
   ufw allow 80/tcp
   ufw allow 443/tcp
