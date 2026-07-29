@@ -10,17 +10,30 @@ case "$command_name:$*" in
       'passwordauthentication no' \
       'allowusers deployer'
     ;;
-  'ufw:status')
+  'ufw:status verbose')
     printf '%s\n' 'Status: active'
+    if [ "${STUB_DEFAULT_INCOMING:-deny}" = deny ]; then
+      printf '%s\n' 'Default: deny (incoming), allow (outgoing), disabled (routed)'
+    else
+      printf '%s\n' 'Default: allow (incoming), allow (outgoing), disabled (routed)'
+    fi
     if [ "${STUB_RESTRICTED_SSH:-true}" = true ]; then
-      printf '%s\n' '22/tcp                     LIMIT IN    10.0.0.0/24'
+      if [ "${STUB_ZERO_PREFIX_SSH:-false}" = true ]; then
+        printf '%s\n' '22/tcp                     LIMIT IN    10.0.0.1/0'
+      else
+        printf '%s\n' '22/tcp                     LIMIT IN    10.0.0.0/24'
+      fi
     else
       printf '%s\n' '22/tcp                     LIMIT IN    Anywhere'
     fi
     ;;
   'ufw:show added')
     if [ "${STUB_RESTRICTED_SSH:-true}" = true ]; then
-      printf '%s\n' 'ufw limit from 10.0.0.0/24 to any port 22 proto tcp'
+      if [ "${STUB_ZERO_PREFIX_SSH:-false}" = true ]; then
+        printf '%s\n' 'ufw limit from 10.0.0.1/0 to any port 22 proto tcp'
+      else
+        printf '%s\n' 'ufw limit from 10.0.0.0/24 to any port 22 proto tcp'
+      fi
     else
       printf '%s\n' 'ufw limit 22/tcp'
     fi
