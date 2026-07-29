@@ -14,6 +14,9 @@
 - 호스트 역할별 UFW 계획/적용 스크립트를 추가했다.
 - 프록시 역할은 SSH, HTTP, HTTPS만 허용한다.
 - 앱 역할은 SSH와 지정한 프록시 IPv4/CIDR에서 들어오는 앱 포트만 허용한다.
+- 적용 전에 `ufw show added`를 예상 규칙과 비교하며, 과거 허용 규칙이나 중복 규칙이 하나라도 있으면 변경 없이 중단한다.
+- Docker published port의 UFW 우회를 막기 위해 원래 목적지 주소·포트를 conntrack으로 확인하는 `DOCKER-USER` 정책을 설치한다. 프록시 출처는 허용하고 나머지는 거부한다.
+- Docker 재시작·호스트 재부팅 뒤에도 정책이 복원되도록 Docker 이후 실행되는 oneshot systemd unit을 설치한다.
 - 기본 실행은 계획만 출력한다. `--apply`는 root, UFW/ss 존재 여부와 실제 SSH 포트 리스닝을 확인한 뒤에만 방화벽을 활성화한다.
 
 ## 복구 후 적용 순서
