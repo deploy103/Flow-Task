@@ -1,4 +1,5 @@
-import { lookup } from "node:dns";
+import { lookup, type LookupAddress, type LookupOptions } from "node:dns";
+import type { LookupFunction } from "node:net";
 import ipaddr from "ipaddr.js";
 import { Agent, fetch, type RequestInit } from "undici";
 
@@ -17,6 +18,45 @@ export function selectPublicDnsAddress(addresses: ReadonlyArray<{ address: strin
   return addresses[0] ?? null;
 }
 
+type AllAddressLookup = (
+  hostname: string,
+  options: LookupOptions & { all: true },
+  callback: (error: NodeJS.ErrnoException | null, addresses: LookupAddress[]) => void,
+) => void;
+
+const systemAllAddressLookup: AllAddressLookup = (hostname, options, callback) => {
+  lookup(hostname, options, callback);
+};
+
+export function createPublicNetworkLookup(
+  resolveAddresses: AllAddressLookup = systemAllAddressLookup,
+  addressAllowed: (address: string) => boolean = isPublicNetworkAddress,
+): LookupFunction {
+  return (hostname, options, callback) => {
+    resolveAddresses(
+      hostname,
+      { all: true, family: options.family, hints: options.hints, verbatim: true },
+      (error, addresses) => {
+        if (error) {
+          callback(error, options.all ? [] : "", options.all ? undefined : 0);
+          return;
+        }
+        if (!addresses.length || addresses.some(({ address }) => !addressAllowed(address))) {
+          const rejection = new Error("OUTBOUND_PRIVATE_ADDRESS_REJECTED");
+          callback(rejection, options.all ? [] : "", options.all ? undefined : 0);
+          return;
+        }
+        if (options.all) {
+          callback(null, addresses);
+          return;
+        }
+        const selected = addresses[0];
+        callback(null, selected.address, selected.family);
+      },
+    );
+  };
+}
+
 export function validatePublicHttpsUrl(input: string | URL) {
   try {
     const url = new URL(input);
@@ -33,24 +73,7 @@ export function validatePublicHttpsUrl(input: string | URL) {
 
 const publicNetworkAgent = new Agent({
   connect: {
-    lookup(hostname, options, callback) {
-      lookup(
-        hostname,
-        { all: true, family: options.family, hints: options.hints, verbatim: true },
-        (error, addresses) => {
-          if (error) {
-            callback(error, "", 0);
-            return;
-          }
-          const selected = selectPublicDnsAddress(addresses);
-          if (!selected) {
-            callback(new Error("OUTBOUND_PRIVATE_ADDRESS_REJECTED"), "", 0);
-            return;
-          }
-          callback(null, selected.address, selected.family);
-        },
-      );
-    },
+    lookup: createPublicNetworkLookup(),
   },
 });
 

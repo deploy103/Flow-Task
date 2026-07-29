@@ -25,3 +25,9 @@
 - allowlist 도메인이 사설·예약 IP도 함께 반환하면 외부 연동이 실패한다. split DNS가 필요하면 공개 서비스와 내부 서비스를 분리해야 한다.
 - 이미지·Action 업데이트는 digest/SHA 갱신 PR로 명시적으로 수행한다.
 - Docker Compose 실제 기동 검증은 앱 서버가 복구된 뒤 이슈 #100의 백업·배포·smoke test와 함께 수행한다.
+
+## 리뷰 반영
+
+- PR #106의 리뷰 AI가 Undici/Node의 custom DNS lookup이 `all: true`를 요청할 때 주소 배열을 반환해야 하는 계약 위반을 발견했다.
+- 모든 DNS 결과를 검사하는 정책은 유지하되, 호출 옵션에 따라 배열 또는 단일 주소 형식으로 반환하도록 수정했다.
+- 로컬 HTTP fixture에 실제 Undici Agent가 연결하는 테스트를 추가해 공개 외부 요청 경로가 `ERR_INVALID_IP_ADDRESS`로 실패하던 회귀를 차단했다.
