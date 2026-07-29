@@ -53,6 +53,24 @@ fi
 grep -q '^FAIL 2 ' "$temporary_directory/duplicate-ufw.result" ||
   fail "duplicate firewall rule not reported"
 
+if PATH="$stub_directory:$PATH" FLOW_TASK_SYSTEM_ROOT="$system_root" \
+  STUB_DEFAULT_INCOMING=allow WAF_PROVIDER=cloudflare sh "$script" proxy \
+  > "$temporary_directory/default-allow.result"; then
+  fail "default-allow incoming policy passed the audit"
+fi
+grep -q '^FAIL 2 ' "$temporary_directory/default-allow.result" ||
+  fail "default-allow incoming policy not reported"
+
+if PATH="$stub_directory:$PATH" FLOW_TASK_SYSTEM_ROOT="$system_root" \
+  STUB_ZERO_PREFIX_SSH=true WAF_PROVIDER=cloudflare sh "$script" proxy \
+  > "$temporary_directory/zero-prefix-ssh.result"; then
+  fail "zero-prefix SSH source passed the audit"
+fi
+grep -q '^FAIL 2 ' "$temporary_directory/zero-prefix-ssh.result" ||
+  fail "zero-prefix SSH source not rejected by role allowlist"
+grep -q '^FAIL 4 ' "$temporary_directory/zero-prefix-ssh.result" ||
+  fail "zero-prefix SSH source not rejected as a source restriction"
+
 app_result=$(PATH="$stub_directory:$PATH" FLOW_TASK_SYSTEM_ROOT="$system_root" \
   STUB_UFW_ROLE=app WAF_PROVIDER=cloudflare sh "$script" app)
 printf '%s\n' "$app_result" | grep -q '^SUMMARY pass=11 fail=0 warn=1$' ||

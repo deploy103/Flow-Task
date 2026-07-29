@@ -28,7 +28,7 @@ else
   result FAIL 1 "SSH must disable password and root login while keeping public keys enabled"
 fi
 
-ufw_status=$(ufw status 2>/dev/null || true)
+ufw_status=$(ufw status verbose 2>/dev/null || true)
 ufw_added=$(ufw show added 2>/dev/null | sed -n '/^ufw /p' || true)
 ufw_rules_valid=false
 ssh_port=$(printf '%s\n' "$sshd_effective" | awk '$1 == "port" {print $2; exit}')
@@ -36,7 +36,7 @@ ssh_port=${ssh_port:-22}
 
 restricted_ssh_added=$(printf '%s\n' "$ufw_added" |
   grep -E "^ufw limit from [0-9]+(\.[0-9]+){3}(/[0-9]+)? to any port ${ssh_port} proto tcp$" |
-  grep -Ev '^ufw limit from 0\.0\.0\.0/0 ' |
+  grep -Ev '^ufw limit from [^ ]+/0 ' |
   head -1 || true)
 if [ "$role" = "proxy" ]; then
   rule_count=$(printf '%s\n' "$ufw_added" | grep -c '^ufw ' || true)
@@ -53,6 +53,7 @@ else
   rule_count=$(printf '%s\n' "$ufw_added" | grep -c '^ufw ' || true)
   if [ "$rule_count" -eq 2 ] && [ -n "$restricted_ssh_added" ] &&
     printf '%s\n' "$proxy_source" | grep -Eq '^[0-9]+(\.[0-9]+){3}(/[0-9]+)?$' &&
+    ! printf '%s\n' "$proxy_source" | grep -q '/0$' &&
     printf '%s\n' "$app_port" | grep -Eq '^[0-9]+$' &&
     [ "$(printf '%s\n' "$ufw_added" | grep -Fxc "$expected_app_rule")" -eq 1 ]; then
     ufw_rules_valid=true
@@ -61,6 +62,7 @@ fi
 
 if command -v ufw >/dev/null 2>&1 &&
   printf '%s\n' "$ufw_status" | grep -q '^Status: active' &&
+  printf '%s\n' "$ufw_status" | grep -q '^Default: deny (incoming),' &&
   [ "$ufw_rules_valid" = true ]; then
   result PASS 2 "UFW active with only role-allowed rules"
 else
@@ -81,7 +83,7 @@ fi
 
 restricted_ssh_source=$(printf '%s\n' "$ufw_status" |
   grep -E "^${ssh_port}(/tcp)?[[:space:]]+(LIMIT|ALLOW)[[:space:]]+IN[[:space:]]+" |
-  grep -Ev '(Anywhere|0\.0\.0\.0/0|::/0)' | head -1 || true)
+  grep -Ev '(Anywhere|/0([[:space:]]|$)|::/0)' | head -1 || true)
 if printf '%s\n' "$sshd_effective" | grep -Eq '^(allowusers|allowgroups) ' &&
   [ -n "$restricted_ssh_source" ]; then
   result PASS 4 "SSH principal and source network restricted"
