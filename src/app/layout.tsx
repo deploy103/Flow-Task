@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
 
@@ -19,7 +20,9 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // A per-request CSP nonce cannot be embedded into prerendered HTML.
+  await connection();
   return (
     <html lang="ko">
       <body><PwaRegister />{children}</body>
