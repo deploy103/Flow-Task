@@ -33,6 +33,12 @@ fi
 if sh "$script" --role proxy --ssh-source 10.0.0.0/99 >/dev/null 2>&1; then
   fail "invalid SSH source accepted"
 fi
+if sh "$script" --role proxy --ssh-source 10.0.0.1/0 >/dev/null 2>&1; then
+  fail "global SSH CIDR accepted"
+fi
+if sh "$script" --role app --proxy-source 10.0.0.1/0 --app-bind-address 10.0.0.225 >/dev/null 2>&1; then
+  fail "global proxy CIDR accepted"
+fi
 
 stub_directory="$temporary_directory/bin"
 mkdir -p "$stub_directory"

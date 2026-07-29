@@ -45,7 +45,7 @@ valid_port() {
 valid_ipv4_source() {
   printf '%s\n' "$1" | awk -F/ '
     NF < 1 || NF > 2 { exit 1 }
-    NF == 2 && ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 > 32) { exit 1 }
+    NF == 2 && ($2 !~ /^[0-9]+$/ || $2 < 1 || $2 > 32) { exit 1 }
     {
       count = split($1, octets, ".")
       if (count != 4) exit 1
