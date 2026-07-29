@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { isIP } from "node:net";
 import { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { resolveTrustedClientIp } from "@/lib/request-security";
 
 const policies = {
   LOGIN: {
@@ -64,10 +64,8 @@ export function resolveAuthRateLimitSourceKey(
   requestHeaders: { get(name: string): string | null },
   trustProxy = process.env.AUTH_TRUST_PROXY === "true",
 ) {
-  if (trustProxy) {
-    const proxyAddress = requestHeaders.get("x-real-ip")?.trim();
-    if (proxyAddress && isIP(proxyAddress)) return `source:${proxyAddress}`;
-  }
+  const proxyAddress = resolveTrustedClientIp(requestHeaders, trustProxy);
+  if (proxyAddress) return `source:${proxyAddress}`;
   return UNTRUSTED_DIRECT_SOURCE_KEY;
 }
 
