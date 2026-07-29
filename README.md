@@ -90,7 +90,7 @@ npm run build
 - 제출 수정은 기존 레코드를 덮어쓰지 않고 새 버전을 만들며 모든 상태 변경을 감사 로그에 기록합니다.
 - 비밀값, 운영 설정, 사용자 데이터는 저장소에 포함하지 않습니다.
 
-Docker Compose 예시는 [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml)에 있습니다. DB 포트는 호스트에 공개하지 않습니다.
+Docker Compose 예시는 [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml)에 있습니다. DB 포트는 호스트에 공개하지 않습니다. 앱·마이그레이션의 read-only filesystem, capability 제거, PID 제한과 내부 DB 네트워크를 기본 적용합니다. 이미지와 CI Action은 공급망 변조를 줄이기 위해 digest/SHA로 고정되어 있으므로 버전 태그만 바꾸지 말고 [심층 방어 기준](docs/security-defense-in-depth.md)의 갱신 절차를 따릅니다.
 
 앱과 리버스 프록시가 같은 서버라면 `APP_BIND_ADDRESS=127.0.0.1` 기본값을 유지합니다. 별도 프록시 서버가 앱 서버의 사설 주소로 접근하는 구성에서만 `APP_BIND_ADDRESS`를 해당 사설 주소로 바꾸고, `deploy/scripts/harden-host-firewall.sh --role app --proxy-source <프록시 사설 IP> --app-bind-address <앱 사설 IP>`로 앱 포트를 프록시 한 곳에만 허용합니다. 스크립트는 기본적으로 계획만 출력하며 검토 후 root로 `--apply`를 지정해야 실제 UFW와 Docker `DOCKER-USER` 체인을 변경합니다. 예상 외 기존 UFW 허용 규칙이 있으면 적용 전에 중단합니다.
 

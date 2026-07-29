@@ -27,6 +27,16 @@ services:
       AUTH_TRUST_PROXY: ${AUTH_TRUST_PROXY:-false}
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /app/.next/cache:rw,noexec,nosuid,nodev,size=128m
     volumes:
       - local_storage:/app/data/uploads
     depends_on:
@@ -41,11 +51,12 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - app_network
-      - mail_network
+      app_network: {}
+      mail_network:
+        gw_priority: 1
 
   smtp:
-    image: boky/postfix:v5.1.0-alpine
+    image: boky/postfix:v5.1.0-alpine@sha256:6e761312e833947f77af755072c0e77b67d298d127595470a79e9454008dd594
     hostname: ${SMTP_HOSTNAME:-mail.example.com}
     environment:
       ALLOWED_SENDER_DOMAINS: ${SMTP_ALLOWED_SENDER_DOMAINS:-mail.example.com}
@@ -72,6 +83,17 @@ services:
     command: ["sh", "-c", "node deploy/scripts/preflight-local-auth.mjs && npx prisma migrate deploy"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      HOME: /tmp
+      NPM_CONFIG_CACHE: /tmp/.npm
+    user: "1001:1001"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
     depends_on:
       db:
         condition: service_healthy
@@ -80,7 +102,7 @@ services:
       - app_network
 
   db:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -95,6 +117,9 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     networks:
       - app_network
 
@@ -107,6 +132,7 @@ volumes:
 networks:
   app_network:
     driver: bridge
+    internal: true
   mail_network:
     driver: bridge
     ipam:

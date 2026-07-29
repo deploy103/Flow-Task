@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { decryptIntegrationValue } from "@/features/integration/crypto";
 import { validateIntegrationUrl } from "@/features/integration/url-policy";
 import { getNotificationDeliveryEnvironment } from "@/lib/env";
+import { fetchPublicNetwork } from "@/lib/outbound-http";
 import { prisma } from "@/lib/prisma";
 
 export async function queueNotificationDeliveries(userId: string) {
@@ -31,7 +32,8 @@ async function deliverExternal(delivery: { channel: NotificationChannel; notific
   if (!validateIntegrationUrl(endpoint, integration.kind, env.allowedHosts)) throw new Error("INTEGRATION_ENDPOINT_REJECTED");
   const secret = integration.secretCiphertext ? decryptIntegrationValue(integration.secretCiphertext, env.INTEGRATION_ENCRYPTION_KEY) : null;
   const body = integration.kind === OrganizationIntegrationKind.DISCORD_WEBHOOK ? { content: `**${delivery.notification.title}**\n${delivery.notification.body}\n${delivery.notification.href}` } : integration.kind === OrganizationIntegrationKind.EMAIL_RELAY ? { to: delivery.notification.user.email, subject: delivery.notification.title, text: delivery.notification.body, href: delivery.notification.href } : { event: "notification.created", notification: { title: delivery.notification.title, body: delivery.notification.body, href: delivery.notification.href } };
-  const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json", ...(secret ? { Authorization: `Bearer ${secret}` } : {}) }, body: JSON.stringify(body), redirect: "error", signal: AbortSignal.timeout(10_000) });
+  const response = await fetchPublicNetwork(endpoint, { method: "POST", headers: { "Content-Type": "application/json", ...(secret ? { Authorization: `Bearer ${secret}` } : {}) }, body: JSON.stringify(body), redirect: "error", signal: AbortSignal.timeout(10_000) });
+  await response.body?.cancel();
   if (!response.ok) throw new Error(`INTEGRATION_HTTP_${response.status}`);
 }
 
