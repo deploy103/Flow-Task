@@ -8,5 +8,11 @@ case "$command_name:$*" in
     printf '%s\n' 'Added user rules:'
     [ -z "${STUB_UFW_RULE:-}" ] || printf '%s\n' "$STUB_UFW_RULE"
     ;;
-  'iptables:-w -N FLOW_TASK_INGRESS'|'iptables:-w -C DOCKER-USER -j FLOW_TASK_INGRESS') exit 1 ;;
+  'iptables:-w -N FLOW_TASK_INGRESS') exit 1 ;;
+  'iptables:-w -C DOCKER-USER -j FLOW_TASK_INGRESS')
+    [ -f "${STUB_DOCKER_JUMP_STATE:?}" ] || exit 1
+    ;;
+  'iptables:-w -I DOCKER-USER 1 -j FLOW_TASK_INGRESS')
+    : > "${STUB_DOCKER_JUMP_STATE:?}"
+    ;;
 esac

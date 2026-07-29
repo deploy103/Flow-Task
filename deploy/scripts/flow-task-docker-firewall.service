@@ -2,6 +2,7 @@
 Description=Flow Task Docker ingress firewall
 Requires=docker.service
 After=docker.service
+PartOf=docker.service
 
 [Service]
 Type=oneshot

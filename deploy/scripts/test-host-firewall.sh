@@ -53,8 +53,38 @@ configuration="$temporary_directory/docker-firewall.conf"
 printf '%s\n' 'PROXY_SOURCE=10.0.0.12' 'APP_BIND_ADDRESS=10.0.0.225' 'APP_PORT=3000' > "$configuration"
 : > "$command_log"
 STUB_COMMAND_LOG="$command_log" PATH="$stub_directory:$PATH" \
+  STUB_DOCKER_JUMP_STATE="$temporary_directory/docker-jump" \
   FLOW_TASK_FIREWALL_CONFIG="$configuration" sh "$script_dir/configure-docker-user-firewall.sh"
 grep -q -- '--ctorigdst 10.0.0.225 --ctorigdstport 3000 -j ACCEPT' "$command_log" || fail "Docker proxy allow rule missing"
 grep -q -- '--ctorigdst 10.0.0.225 --ctorigdstport 3000 -j DROP' "$command_log" || fail "Docker fallback drop rule missing"
+
+# Docker may rebuild DOCKER-USER on restart. Model that loss, rerun the unit's
+# command, and verify the jump is installed again rather than merely checking
+# that the unit file contains a dependency string.
+rm -f "$temporary_directory/docker-jump"
+STUB_COMMAND_LOG="$command_log" PATH="$stub_directory:$PATH" \
+  STUB_DOCKER_JUMP_STATE="$temporary_directory/docker-jump" \
+  FLOW_TASK_FIREWALL_CONFIG="$configuration" sh "$script_dir/configure-docker-user-firewall.sh"
+[ "$(grep -c 'iptables -w -I DOCKER-USER 1 -j FLOW_TASK_INGRESS' "$command_log")" -eq 2 ] ||
+  fail "Docker restart simulation did not restore the chain jump"
+
+command -v systemd-analyze >/dev/null 2>&1 || fail "systemd-analyze is required"
+systemd_root="$temporary_directory/systemd-root"
+mkdir -p "$systemd_root/etc/systemd/system" "$systemd_root/usr/local/sbin"
+install -m 0644 "$script_dir/flow-task-docker-firewall.service" \
+  "$systemd_root/etc/systemd/system/flow-task-docker-firewall.service"
+install -m 0755 "$script_dir/configure-docker-user-firewall.sh" \
+  "$systemd_root/usr/local/sbin/flow-task-docker-firewall"
+printf '%s\n' \
+  '[Unit]' \
+  'Description=Test Docker daemon' \
+  '[Service]' \
+  'Type=oneshot' \
+  'ExecStart=/usr/local/sbin/flow-task-docker-firewall' \
+  'RemainAfterExit=yes' > "$systemd_root/etc/systemd/system/docker.service"
+printf '%s\n' '[Unit]' 'Description=Test system initialization' > \
+  "$systemd_root/etc/systemd/system/sysinit.target"
+systemd-analyze verify --root="$systemd_root" flow-task-docker-firewall.service >/dev/null 2>&1 ||
+  fail "systemd unit verification failed"
 
 printf '%s\n' "Host firewall script tests passed."
