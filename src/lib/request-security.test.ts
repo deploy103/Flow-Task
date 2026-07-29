@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasTrustedMutationOrigin, readBoundedJson } from "./request-security";
+import { hasTrustedMutationOrigin, readBoundedJson, resolveTrustedClientIp } from "./request-security";
 
 describe("mutation request security", () => {
   it("accepts the request origin and rejects missing or cross-site origins", () => {
@@ -9,14 +9,21 @@ describe("mutation request security", () => {
   });
 
   it("accepts a configured public origin behind an internal proxy", () => {
-    const previous = process.env.NEXT_PUBLIC_APP_URL;
-    process.env.NEXT_PUBLIC_APP_URL = "https://flow.example.com";
-    try {
-      expect(hasTrustedMutationOrigin(new Request("http://app:3000/api", { headers: { Origin: "https://flow.example.com" } }))).toBe(true);
-    } finally {
-      if (previous === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
-      else process.env.NEXT_PUBLIC_APP_URL = previous;
-    }
+    expect(hasTrustedMutationOrigin(new Request("http://app:3000/api", { headers: { Origin: "https://flow.example.com" } }), "https://flow.example.com", true)).toBe(true);
+  });
+
+  it("does not trust an attacker-controlled request host in production", () => {
+    const rebound = new Request("https://attacker.example/api", { headers: { Origin: "https://attacker.example" } });
+    expect(hasTrustedMutationOrigin(rebound, "https://flow.example.com", true)).toBe(false);
+    expect(hasTrustedMutationOrigin(rebound, undefined, true)).toBe(false);
+    expect(hasTrustedMutationOrigin(rebound, undefined, false)).toBe(true);
+  });
+
+  it("uses only a proxy-overwritten real IP when proxy trust is explicit", () => {
+    const headers = { get: (name: string) => ({ "x-real-ip": "203.0.113.9", "x-forwarded-for": "198.51.100.4" })[name.toLowerCase()] ?? null };
+    expect(resolveTrustedClientIp(headers, false)).toBeNull();
+    expect(resolveTrustedClientIp(headers, true)).toBe("203.0.113.9");
+    expect(resolveTrustedClientIp({ get: () => "203.0.113.9, 10.0.0.2" }, true)).toBeNull();
   });
 });
 

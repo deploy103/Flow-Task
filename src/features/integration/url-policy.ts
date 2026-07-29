@@ -1,12 +1,12 @@
 import { isIP } from "node:net";
 import { OrganizationIntegrationKind } from "@prisma/client";
+import { isPublicNetworkAddress } from "@/lib/outbound-http";
 
 const BLOCKED_NAMES = new Set(["localhost", "localhost.localdomain"]);
 
 function privateLiteral(hostname: string) {
-  if (isIP(hostname) === 4) { const [a, b] = hostname.split(".").map(Number); return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168); }
-  if (isIP(hostname) === 6) return hostname === "::1" || hostname.startsWith("fc") || hostname.startsWith("fd") || hostname.startsWith("fe80:");
-  return false;
+  const literal = hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+  return isIP(literal) !== 0 && !isPublicNetworkAddress(literal);
 }
 
 export function validateIntegrationUrl(raw: string, kind: OrganizationIntegrationKind, allowedHosts: string[]) {

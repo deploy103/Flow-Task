@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
 import { digestQuizClientIp, integrityDedupeKey, isPlausibleIntegrityTime } from "@/features/quiz/integrity";
 import { prisma } from "@/lib/prisma";
-import { hasTrustedMutationOrigin, readBoundedJson } from "@/lib/request-security";
+import { hasTrustedMutationOrigin, readBoundedJson, resolveTrustedClientIp } from "@/lib/request-security";
 
 const bodySchema = z.object({ attemptId: z.uuid(), type: z.enum([QuizIntegrityEventType.TAB_HIDDEN, QuizIntegrityEventType.WINDOW_BLUR, QuizIntegrityEventType.COPY, QuizIntegrityEventType.PASTE]), occurredAt: z.iso.datetime() });
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const attempt = await prisma.quizAttempt.findFirst({ where: { id: parsed.data.attemptId, userId: user.id, status: QuizAttemptStatus.IN_PROGRESS }, select: { id: true } });
   if (!attempt) return NextResponse.json({ error: "not_found" }, { status: 404 });
   const requestHeaders = await headers();
-  const ip = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || requestHeaders.get("x-real-ip")?.trim() || "unknown";
+  const ip = resolveTrustedClientIp(requestHeaders) ?? "untrusted-direct";
   let digest: string;
   try { digest = digestQuizClientIp(ip); } catch { return NextResponse.json({ error: "server_configuration" }, { status: 503 }); }
   const previous = await prisma.quizIntegrityEvent.findFirst({ where: { attemptId: attempt.id, clientIpDigest: { not: null } }, orderBy: { occurredAt: "desc" }, select: { clientIpDigest: true } });
