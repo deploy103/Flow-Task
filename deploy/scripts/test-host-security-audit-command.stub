@@ -1,0 +1,34 @@
+#!/bin/sh
+command_name=${0##*/}
+
+case "$command_name:$*" in
+  'sshd:-T')
+    printf '%s\n' \
+      'port 22' \
+      'permitrootlogin no' \
+      'pubkeyauthentication yes' \
+      'passwordauthentication no' \
+      'allowusers deployer'
+    ;;
+  'ufw:status')
+    printf '%s\n' 'Status: active'
+    if [ "${STUB_RESTRICTED_SSH:-true}" = true ]; then
+      printf '%s\n' '22/tcp                     LIMIT IN    10.0.0.0/24'
+    else
+      printf '%s\n' '22/tcp                     LIMIT IN    Anywhere'
+    fi
+    ;;
+  'id:www-data') exit 0 ;;
+  'id:-nG www-data') printf '%s\n' 'www-data' ;;
+  'nginx:-t') exit 0 ;;
+  'nginx:-T') printf '%s\n' 'server { autoindex off; }' ;;
+  'certbot:certificates') printf '%s\n' 'VALID: 80 days' ;;
+  'getenforce:') printf '%s\n' 'Disabled' ;;
+  'aa-status:--enabled') exit 0 ;;
+  'systemctl:is-active --quiet systemd-journald.service') exit 0 ;;
+  'systemctl:is-active --quiet fail2ban.service') exit 0 ;;
+  'systemctl:is-enabled --quiet unattended-upgrades.service') exit 0 ;;
+  'fail2ban-client:status') printf '%s\n' 'Jail list: sshd' ;;
+  'apt-get:-s upgrade') printf '%s\n' '0 upgraded, 0 newly installed' ;;
+  *) exit 1 ;;
+esac
