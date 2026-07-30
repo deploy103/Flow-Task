@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { MembershipStatus, MentoringRole, SecurityTrack } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { canAssignMentorRelation } from "./mentor-relation";
+import { canAssignMentorRelation, getInvalidMentorRelationIds, getValidMentorId } from "./mentor-relation";
 
 const active = (mentoringRole: MentoringRole, securityTrack: SecurityTrack = SecurityTrack.PWNABLE) => ({ mentoringRole, securityTrack, status: MembershipStatus.ACTIVE });
 
@@ -24,5 +24,22 @@ describe("mentor relation assignment", () => {
     expect(migration).toContain("CREATE UNIQUE INDEX \"mentor_relations_one_active_primary_per_mentee_key\"");
     expect(migration).toContain("(\"organization_id\", \"mentee_id\")");
     expect(migration).toContain("WHERE \"type\" = 'PRIMARY' AND \"ended_at\" IS NULL");
+  });
+
+  it("rejects stale relation references after a member classification changes", () => {
+    const relation = { id: "relation-1", mentorId: "mentor", menteeId: "mentee" };
+    const validMembers = [
+      { userId: "mentor", ...active(MentoringRole.MENTOR) },
+      { userId: "mentee", ...active(MentoringRole.MENTEE) },
+    ];
+    expect(getValidMentorId(relation, validMembers)).toBe("mentor");
+    expect(getInvalidMentorRelationIds([relation], validMembers)).toEqual([]);
+
+    const changedMembers = [
+      { userId: "mentor", ...active(MentoringRole.NONE) },
+      { userId: "mentee", ...active(MentoringRole.MENTEE) },
+    ];
+    expect(getValidMentorId(relation, changedMembers)).toBeNull();
+    expect(getInvalidMentorRelationIds([relation], changedMembers)).toEqual(["relation-1"]);
   });
 });
