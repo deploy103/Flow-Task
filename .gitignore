@@ -16,6 +16,9 @@ uploads/
 tmp/
 *.log
 
+# Local development journals
+배포금지_개발일지/
+
 # Secrets and keys
 *.pem
 *.key
