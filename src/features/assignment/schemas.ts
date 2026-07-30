@@ -106,6 +106,10 @@ export const createAssignmentSchema = z
 
 export const assignmentTargetIdsSchema = z.array(z.uuid()).max(MAX_ASSIGNMENT_TARGET_COUNT);
 export const assignmentOrganizationIdSchema = z.uuid();
+export const assignmentReferenceSchema = z.object({
+  organizationId: z.uuid(),
+  assignmentId: z.uuid(),
+});
 export const assignmentFieldTypesSchema = z
   .array(z.enum([AssignmentFieldType.TEXT, AssignmentFieldType.FILE, AssignmentFieldType.LINK]))
   .max(3)

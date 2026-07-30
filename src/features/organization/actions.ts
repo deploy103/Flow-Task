@@ -1,11 +1,12 @@
 "use server";
 
-import { MembershipRole, MembershipStatus, Prisma, QuestionStatus, SystemRole } from "@prisma/client";
+import { ClubPosition, MembershipRole, MembershipStatus, MentoringRole, Prisma, QuestionStatus, SystemRole } from "@prisma/client";
 import { addDays } from "./date";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
+import { getInvalidMentorRelationIds } from "@/features/question/mentor-relation";
 import { requireOrganizationAccess } from "./guards";
 import { generateInvitationCode, hashInvitationCode } from "./invitation-code";
 import {
@@ -44,6 +45,8 @@ export async function createOrganization(formData: FormData) {
           organizationId: created.id,
           userId: user.id,
           role: MembershipRole.ORG_ADMIN,
+          position: ClubPosition.PRESIDENT,
+          mentoringRole: MentoringRole.NONE,
         },
       });
       await transaction.auditLog.create({
@@ -217,11 +220,18 @@ export async function joinOrganization(formData: FormData) {
               userId: user.id,
             },
           },
-          update: { role: invitation.role, status: MembershipStatus.ACTIVE },
+          update: {
+            role: invitation.role,
+            position: ClubPosition.MEMBER,
+            mentoringRole: invitation.role === MembershipRole.MENTOR ? MentoringRole.MENTOR : MentoringRole.MENTEE,
+            status: MembershipStatus.ACTIVE,
+          },
           create: {
             organizationId: invitation.organizationId,
             userId: user.id,
             role: invitation.role,
+            position: ClubPosition.MEMBER,
+            mentoringRole: invitation.role === MembershipRole.MENTOR ? MentoringRole.MENTOR : MentoringRole.MENTEE,
           },
         });
         await transaction.organizationInvite.update({
@@ -267,9 +277,15 @@ export async function updateMemberRole(formData: FormData) {
           throw new Error("MEMBER_NOT_FOUND");
         }
 
+        const nextRole = parsed.data.position === ClubPosition.PRESIDENT || parsed.data.position === ClubPosition.VICE_PRESIDENT
+          ? MembershipRole.ORG_ADMIN
+          : parsed.data.mentoringRole === MentoringRole.MENTOR
+            ? MembershipRole.MENTOR
+            : MembershipRole.MEMBER;
+
         if (
           target.role === MembershipRole.ORG_ADMIN &&
-          parsed.data.role !== MembershipRole.ORG_ADMIN
+          nextRole !== MembershipRole.ORG_ADMIN
         ) {
           const adminCount = await transaction.organizationMember.count({
             where: {
@@ -288,8 +304,36 @@ export async function updateMemberRole(formData: FormData) {
               userId: parsed.data.memberId,
             },
           },
-          data: { role: parsed.data.role },
+          data: {
+            role: nextRole,
+            position: parsed.data.position,
+            securityTrack: parsed.data.securityTrack,
+            mentoringRole: parsed.data.mentoringRole,
+          },
         });
+        const activeRelations = await transaction.mentorRelation.findMany({
+          where: {
+            organizationId: parsed.data.organizationId,
+            endedAt: null,
+            OR: [{ mentorId: parsed.data.memberId }, { menteeId: parsed.data.memberId }],
+          },
+          select: { id: true, mentorId: true, menteeId: true },
+        });
+        const participantIds = [...new Set(activeRelations.flatMap(({ mentorId, menteeId }) => [mentorId, menteeId]))];
+        const relationMembers = participantIds.length ? await transaction.organizationMember.findMany({
+          where: {
+            organizationId: parsed.data.organizationId,
+            userId: { in: participantIds },
+          },
+          select: { userId: true, mentoringRole: true, securityTrack: true, status: true },
+        }) : [];
+        const endedMentorRelationIds = getInvalidMentorRelationIds(activeRelations, relationMembers);
+        if (endedMentorRelationIds.length) {
+          await transaction.mentorRelation.updateMany({
+            where: { id: { in: endedMentorRelationIds }, organizationId: parsed.data.organizationId, endedAt: null },
+            data: { endedAt: new Date() },
+          });
+        }
         await transaction.auditLog.create({
           data: {
             actorId: user.id,
@@ -297,7 +341,14 @@ export async function updateMemberRole(formData: FormData) {
             action: "MEMBER_ROLE_UPDATED",
             targetType: "ORGANIZATION_MEMBER",
             targetId: parsed.data.memberId,
-            metadata: { previousRole: target.role, role: parsed.data.role },
+            metadata: {
+              previousRole: target.role,
+              role: nextRole,
+              position: parsed.data.position,
+              securityTrack: parsed.data.securityTrack,
+              mentoringRole: parsed.data.mentoringRole,
+              endedMentorRelationIds,
+            },
           },
         });
       },

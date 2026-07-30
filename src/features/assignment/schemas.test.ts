@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ASSIGNMENT_SETUP_TYPE } from "@/constants/assignment";
 import {
   assignmentFieldTypesSchema,
+  assignmentReferenceSchema,
   assignmentTargetIdsSchema,
   createAssignmentSchema,
 } from "./schemas";
@@ -19,6 +20,17 @@ const validInput = {
 };
 
 describe("assignment schemas", () => {
+  it("validates assignment archive references", () => {
+    expect(assignmentReferenceSchema.safeParse({
+      organizationId: "550e8400-e29b-41d4-a716-446655440000",
+      assignmentId: "550e8400-e29b-41d4-a716-446655440001",
+    }).success).toBe(true);
+    expect(assignmentReferenceSchema.safeParse({
+      organizationId: "not-a-uuid",
+      assignmentId: "550e8400-e29b-41d4-a716-446655440001",
+    }).success).toBe(false);
+  });
+
   it("converts KST date input to UTC and parses checkbox values", () => {
     const result = createAssignmentSchema.parse(validInput);
     expect(result.opensAt.toISOString()).toBe("2026-07-16T00:00:00.000Z");

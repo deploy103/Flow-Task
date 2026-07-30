@@ -18,6 +18,27 @@ enum MembershipRole {
   ORG_ADMIN
 }
 
+enum ClubPosition {
+  PRESIDENT
+  VICE_PRESIDENT
+  MEMBER
+}
+
+enum SecurityTrack {
+  PWNABLE
+  WEB
+  FORENSICS
+  CRYPTOGRAPHY
+  REVERSING
+  MISCELLANEOUS
+}
+
+enum MentoringRole {
+  MENTOR
+  MENTEE
+  NONE
+}
+
 enum MembershipStatus {
   ACTIVE
   INACTIVE
@@ -407,6 +428,9 @@ model OrganizationMember {
   organizationId String           @map("organization_id") @db.Uuid
   userId         String           @map("user_id") @db.Uuid
   role           MembershipRole   @default(MEMBER)
+  position       ClubPosition     @default(MEMBER)
+  securityTrack  SecurityTrack?   @map("security_track")
+  mentoringRole  MentoringRole    @default(MENTEE) @map("mentoring_role")
   status         MembershipStatus @default(ACTIVE)
   joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -415,6 +439,7 @@ model OrganizationMember {
 
   @@id([organizationId, userId])
   @@index([userId, status])
+  @@index([organizationId, securityTrack, mentoringRole, status])
   @@map("organization_members")
 }
 
