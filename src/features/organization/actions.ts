@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAuthenticatedUser } from "@/features/auth/guards";
+import { getInvalidMentorRelationIds } from "@/features/question/mentor-relation";
 import { requireOrganizationAccess } from "./guards";
 import { generateInvitationCode, hashInvitationCode } from "./invitation-code";
 import {
@@ -310,6 +311,29 @@ export async function updateMemberRole(formData: FormData) {
             mentoringRole: parsed.data.mentoringRole,
           },
         });
+        const activeRelations = await transaction.mentorRelation.findMany({
+          where: {
+            organizationId: parsed.data.organizationId,
+            endedAt: null,
+            OR: [{ mentorId: parsed.data.memberId }, { menteeId: parsed.data.memberId }],
+          },
+          select: { id: true, mentorId: true, menteeId: true },
+        });
+        const participantIds = [...new Set(activeRelations.flatMap(({ mentorId, menteeId }) => [mentorId, menteeId]))];
+        const relationMembers = participantIds.length ? await transaction.organizationMember.findMany({
+          where: {
+            organizationId: parsed.data.organizationId,
+            userId: { in: participantIds },
+          },
+          select: { userId: true, mentoringRole: true, securityTrack: true, status: true },
+        }) : [];
+        const endedMentorRelationIds = getInvalidMentorRelationIds(activeRelations, relationMembers);
+        if (endedMentorRelationIds.length) {
+          await transaction.mentorRelation.updateMany({
+            where: { id: { in: endedMentorRelationIds }, organizationId: parsed.data.organizationId, endedAt: null },
+            data: { endedAt: new Date() },
+          });
+        }
         await transaction.auditLog.create({
           data: {
             actorId: user.id,
@@ -323,6 +347,7 @@ export async function updateMemberRole(formData: FormData) {
               position: parsed.data.position,
               securityTrack: parsed.data.securityTrack,
               mentoringRole: parsed.data.mentoringRole,
+              endedMentorRelationIds,
             },
           },
         });
