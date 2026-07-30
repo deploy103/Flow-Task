@@ -8,6 +8,7 @@ import { ASSIGNMENT_FIELD_LABELS } from "@/constants/assignment";
 import {
   assignmentFieldTypesSchema,
   assignmentOrganizationIdSchema,
+  assignmentReferenceSchema,
   assignmentTargetIdsSchema,
   createAssignmentSchema,
 } from "./schemas";
@@ -111,4 +112,38 @@ export async function createAssignment(formData: FormData) {
       parsed.data.setupType,
     ),
   );
+}
+
+export async function archiveAssignment(formData: FormData) {
+  const parsed = assignmentReferenceSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/dashboard?error=invalid_assignment");
+
+  const { user } = await requireOrganizationAccess(parsed.data.organizationId, true);
+  const archived = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.assignment.updateMany({
+      where: {
+        id: parsed.data.assignmentId,
+        organizationId: parsed.data.organizationId,
+        archivedAt: null,
+      },
+      data: { archivedAt: new Date() },
+    });
+    if (result.count !== 1) return false;
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: user.id,
+        organizationId: parsed.data.organizationId,
+        action: "ASSIGNMENT_ARCHIVED",
+        targetType: "ASSIGNMENT",
+        targetId: parsed.data.assignmentId,
+      },
+    });
+    return true;
+  });
+
+  if (!archived) {
+    redirect(`/organizations/${parsed.data.organizationId}/assignments?error=not_found`);
+  }
+  redirect(`/organizations/${parsed.data.organizationId}/assignments?success=archived`);
 }

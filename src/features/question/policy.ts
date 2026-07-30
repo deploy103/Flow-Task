@@ -1,9 +1,9 @@
-import { MembershipRole, MembershipStatus, QuestionBoardType, QuestionStatus, SystemRole } from "@prisma/client";
+import { MembershipRole, MembershipStatus, MentoringRole, QuestionBoardType, QuestionStatus, SystemRole } from "@prisma/client";
 
-type Context = { userId: string; systemRole: SystemRole; membership: { role: MembershipRole; status: MembershipStatus } | null; authorId?: string; assignedMentorId?: string | null };
+type Context = { userId: string; systemRole: SystemRole; membership: { role: MembershipRole; mentoringRole: MentoringRole; status: MembershipStatus } | null; authorId?: string; assignedMentorId?: string | null };
 const active = (context: Context) => context.membership?.status === MembershipStatus.ACTIVE;
 const admin = (context: Context) => context.systemRole === SystemRole.SYSTEM_ADMIN || (active(context) && context.membership?.role === MembershipRole.ORG_ADMIN);
-const mentor = (context: Context) => active(context) && context.membership?.role === MembershipRole.MENTOR;
+const mentor = (context: Context) => active(context) && context.membership?.mentoringRole === MentoringRole.MENTOR;
 
 export function canViewQuestion(boardType: QuestionBoardType, context: Context) {
   if (admin(context)) return true;
@@ -17,7 +17,7 @@ export function canViewQuestion(boardType: QuestionBoardType, context: Context) 
 export function canCreateQuestion(boardType: QuestionBoardType, context: Context, hasPrimaryMentor: boolean) {
   if (!active(context) && context.systemRole !== SystemRole.SYSTEM_ADMIN) return false;
   if (boardType === QuestionBoardType.PRIVATE_MENTOR) return hasPrimaryMentor;
-  if (boardType === QuestionBoardType.MENTOR_QNA) return context.membership?.role === MembershipRole.MEMBER || admin(context);
+  if (boardType === QuestionBoardType.MENTOR_QNA) return context.membership?.mentoringRole === MentoringRole.MENTEE || admin(context);
   return true;
 }
 

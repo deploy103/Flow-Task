@@ -1,5 +1,5 @@
 import { AssignmentAudience, AssignmentFieldType, SubmissionReviewDecision, SubmissionStatus } from "@prisma/client";
-import { CalendarClock, ClipboardCheck, FileText, Link as LinkIcon, Upload, Users } from "lucide-react";
+import { ArrowLeft, CalendarClock, ClipboardCheck, FileText, Link as LinkIcon, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
 } from "@/constants/assignment";
 import { getAssignmentTimingStatus, getDeadlineLabel } from "@/features/assignment/timing";
 import { canViewAssignment, isAssignmentPublished } from "@/features/assignment/visibility";
+import { ArchiveAssignmentForm } from "@/features/assignment/components/archive-assignment-form";
 import { AssignmentChallenges } from "@/features/challenge/components/assignment-challenges";
 import { InternalChallenges } from "@/features/challenge/components/internal-challenges";
 import { AssignmentQuizzes } from "@/features/quiz/components/assignment-quizzes";
@@ -149,6 +150,12 @@ export default async function AssignmentDetailPage({
 
   return (
     <div className="max-w-4xl">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-100" href={`/organizations/${organizationId}/assignments`}>
+          <ArrowLeft size={17} /> 과제 목록
+        </Link>
+        {canManage && <ArchiveAssignmentForm assignmentId={assignmentId} assignmentTitle={assignment.title} organizationId={organizationId} />}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
           {TIMING_STATUS_LABELS[timingStatus]}
