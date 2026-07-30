@@ -7,7 +7,7 @@ import { requireOrganizationAccess } from "@/features/organization/guards";
 import { canManageOrganization } from "@/features/organization/permissions";
 import { prisma } from "@/lib/prisma";
 import { canAnswerQuestion, canCreateQuestion, canEditQuestion, canSetQuestionStatus } from "./policy";
-import { canAssignMentorRelation } from "./mentor-relation";
+import { canAssignMentorRelation, getValidMentorId } from "./mentor-relation";
 import { requireQuestionAccess } from "./queries";
 import { acceptAnswerSchema, answerSchema, assignQuestionMentorSchema, createQuestionSchema, deleteQuestionSchema, mentorRelationReferenceSchema, mentorRelationSchema, statusSchema, updateQuestionSchema } from "./schemas";
 import { questionStoragePath, removeQuestionAttachment, uploadQuestionAttachment, validateQuestionAttachment } from "./storage";
@@ -18,8 +18,13 @@ export async function createQuestion(formData: FormData) {
   const parsed = createQuestionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/dashboard?error=invalid_question");
   const { user, membership } = await requireOrganizationAccess(parsed.data.organizationId);
-  const primary = await prisma.mentorRelation.findFirst({ where: { organizationId: parsed.data.organizationId, menteeId: user.id, type: MentorRelationType.PRIMARY, endedAt: null }, select: { mentorId: true } });
-  if (!canCreateQuestion(parsed.data.boardType, { userId: user.id, systemRole: user.systemRole, membership }, Boolean(primary))) redirect(`${path(parsed.data.organizationId)}/new?error=forbidden`);
+  const primary = await prisma.mentorRelation.findFirst({ where: { organizationId: parsed.data.organizationId, menteeId: user.id, type: MentorRelationType.PRIMARY, endedAt: null }, select: { mentorId: true, menteeId: true } });
+  const primaryMembers = primary ? await prisma.organizationMember.findMany({
+    where: { organizationId: parsed.data.organizationId, userId: { in: [primary.mentorId, primary.menteeId] } },
+    select: { userId: true, mentoringRole: true, securityTrack: true, status: true },
+  }) : [];
+  const primaryMentorId = getValidMentorId(primary, primaryMembers);
+  if (!canCreateQuestion(parsed.data.boardType, { userId: user.id, systemRole: user.systemRole, membership }, Boolean(primaryMentorId))) redirect(`${path(parsed.data.organizationId)}/new?error=forbidden`);
   if (parsed.data.relatedAssignmentId) {
     const manage = canManageOrganization({ systemRole: user.systemRole, membership });
     const assignment = await prisma.assignment.findFirst({ where: { id: parsed.data.relatedAssignmentId, organizationId: parsed.data.organizationId, archivedAt: null, ...(manage ? {} : { opensAt: { lte: new Date() }, OR: [{ audience: "ALL_MEMBERS" }, { targets: { some: { userId: user.id } } }] }) }, select: { id: true } });
@@ -34,7 +39,19 @@ export async function createQuestion(formData: FormData) {
   }
   try {
     await prisma.$transaction(async (tx) => {
-      const assignedMentorId = parsed.data.boardType === QuestionBoardType.PRIVATE_MENTOR ? primary?.mentorId : null;
+      let assignedMentorId: string | null = null;
+      if (parsed.data.boardType === QuestionBoardType.PRIVATE_MENTOR) {
+        const currentPrimary = await tx.mentorRelation.findFirst({
+          where: { organizationId: parsed.data.organizationId, menteeId: user.id, type: MentorRelationType.PRIMARY, endedAt: null },
+          select: { mentorId: true, menteeId: true },
+        });
+        const currentMembers = currentPrimary ? await tx.organizationMember.findMany({
+          where: { organizationId: parsed.data.organizationId, userId: { in: [currentPrimary.mentorId, currentPrimary.menteeId] } },
+          select: { userId: true, mentoringRole: true, securityTrack: true, status: true },
+        }) : [];
+        assignedMentorId = getValidMentorId(currentPrimary, currentMembers);
+        if (!assignedMentorId) throw new Error("PRIMARY_MENTOR_UNAVAILABLE");
+      }
       await tx.question.create({ data: { id: questionId, organizationId: parsed.data.organizationId, authorId: user.id, assignedMentorId, relatedAssignmentId: parsed.data.relatedAssignmentId || null, boardType: parsed.data.boardType, category: parsed.data.category, title: parsed.data.title, content: parsed.data.content, attempted: parsed.data.attempted || null, errorMessage: parsed.data.errorMessage || null, code: parsed.data.code || null, attachments: attachment && storagePath ? { create: { storagePath, originalFilename: attachment.metadata.originalFilename, mimeType: attachment.metadata.mimeType, sizeBytes: attachment.metadata.sizeBytes } } : undefined } });
       const recipientIds = parsed.data.boardType === QuestionBoardType.PRIVATE_MENTOR && assignedMentorId ? [assignedMentorId] : (await tx.organizationMember.findMany({ where: { organizationId: parsed.data.organizationId, status: MembershipStatus.ACTIVE, ...(parsed.data.boardType === QuestionBoardType.MENTOR_QNA ? { OR: [{ mentoringRole: MentoringRole.MENTOR }, { role: MembershipRole.ORG_ADMIN }] } : {}) }, select: { userId: true } })).map(({ userId }) => userId).filter((id) => id !== user.id);
       if (recipientIds.length) await tx.notification.createMany({ data: recipientIds.map((userId) => ({ userId, organizationId: parsed.data.organizationId, type: NotificationType.QUESTION_CREATED, title: "새 질문이 등록되었습니다", body: parsed.data.title, href: path(parsed.data.organizationId, questionId), dedupeKey: `question:${questionId}:created` })), skipDuplicates: true });

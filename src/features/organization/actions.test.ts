@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MembershipRole, MembershipStatus, SystemRole } from "@prisma/client";
+import { ClubPosition, MembershipRole, MembershipStatus, MentoringRole, SecurityTrack, SystemRole } from "@prisma/client";
 
 const guard = vi.hoisted(() => ({ requireAuthenticatedUser: vi.fn(), requireOrganizationAccess: vi.fn() }));
 const navigation = vi.hoisted(() => ({
@@ -8,9 +8,9 @@ const navigation = vi.hoisted(() => ({
 const cache = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 const transaction = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
-  organizationMember: { findUnique: vi.fn(), count: vi.fn(), update: vi.fn() },
+  organizationMember: { findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
   departmentMember: { deleteMany: vi.fn() },
-  mentorRelation: { updateMany: vi.fn() },
+  mentorRelation: { findMany: vi.fn(), updateMany: vi.fn() },
   question: { updateMany: vi.fn() },
   organizationInvite: { findFirst: vi.fn(), updateMany: vi.fn() },
   auditLog: { create: vi.fn() },
@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("next/cache", () => cache);
 vi.mock("@/lib/prisma", () => ({ prisma: database }));
 
-import { leaveOrganization, removeOrganizationMember, revokeOrganizationInvitation } from "./actions";
+import { leaveOrganization, removeOrganizationMember, revokeOrganizationInvitation, updateMemberRole } from "./actions";
 
 const USER_ID = "550e8400-e29b-41d4-a716-446655440000";
 const ORGANIZATION_ID = "550e8400-e29b-41d4-a716-446655440001";
@@ -52,6 +52,16 @@ function revokeInvitationForm() {
   return formData;
 }
 
+function updateMemberForm() {
+  const formData = new FormData();
+  formData.set("organizationId", ORGANIZATION_ID);
+  formData.set("memberId", MEMBER_ID);
+  formData.set("position", ClubPosition.MEMBER);
+  formData.set("securityTrack", SecurityTrack.FORENSICS);
+  formData.set("mentoringRole", MentoringRole.MENTOR);
+  return formData;
+}
+
 describe("organization membership actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,6 +75,9 @@ describe("organization membership actions", () => {
       organization: { name: "보안 동아리", archivedAt: null },
     });
     transaction.organizationMember.count.mockResolvedValue(2);
+    transaction.organizationMember.findMany.mockResolvedValue([]);
+    transaction.mentorRelation.findMany.mockResolvedValue([]);
+    transaction.mentorRelation.updateMany.mockResolvedValue({ count: 1 });
     transaction.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
     database.$transaction.mockImplementation(async (callback: (client: typeof transaction) => unknown) => callback(transaction));
   });
@@ -106,6 +119,36 @@ describe("organization membership actions", () => {
       "NEXT_REDIRECT:/profile?error=organization_name_mismatch#organizations",
     );
     expect(transaction.organizationMember.update).not.toHaveBeenCalled();
+  });
+
+  it("ends mentor relations invalidated by a classification change", async () => {
+    transaction.organizationMember.findUnique.mockResolvedValue({
+      userId: MEMBER_ID,
+      role: MembershipRole.MENTOR,
+      status: MembershipStatus.ACTIVE,
+    });
+    transaction.mentorRelation.findMany.mockResolvedValue([
+      { id: "relation-1", mentorId: MEMBER_ID, menteeId: USER_ID },
+    ]);
+    transaction.organizationMember.findMany.mockResolvedValue([
+      { userId: MEMBER_ID, mentoringRole: MentoringRole.MENTOR, securityTrack: SecurityTrack.FORENSICS, status: MembershipStatus.ACTIVE },
+      { userId: USER_ID, mentoringRole: MentoringRole.MENTEE, securityTrack: SecurityTrack.WEB, status: MembershipStatus.ACTIVE },
+    ]);
+
+    await expect(updateMemberRole(updateMemberForm())).rejects.toThrow(
+      `NEXT_REDIRECT:/organizations/${ORGANIZATION_ID}/members?message=role_updated`,
+    );
+
+    expect(transaction.mentorRelation.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["relation-1"] }, organizationId: ORGANIZATION_ID, endedAt: null },
+      data: { endedAt: expect.any(Date) },
+    });
+    expect(transaction.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "MEMBER_ROLE_UPDATED",
+        metadata: expect.objectContaining({ endedMentorRelationIds: ["relation-1"] }),
+      }),
+    });
   });
 
   it("removes a member and cleans up organization-scoped active access", async () => {
