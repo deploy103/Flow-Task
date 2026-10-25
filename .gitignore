@@ -49,3 +49,4 @@ deploy/.env*
 .idea/
 .vscode/
 *.tsbuildinfo
+docs/development/
